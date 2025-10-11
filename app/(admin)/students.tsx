@@ -1,17 +1,20 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { useToast } from '@/components/Toast';
 import { Colors } from '@/constants/colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { User } from '@/models/User';
+import { AdminService } from '@/services/adminService';
 import { UserService } from '@/services/userService';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
 export default function StudentsScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const toast = useToast();
   
   const [students, setStudents] = useState<User[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -25,9 +28,12 @@ export default function StudentsScreen() {
       setLoading(true);
       const users = await UserService.getUsersByRole('student');
       setStudents(users);
+      if (!loading) {
+        toast.success('Students list refreshed');
+      }
     } catch (error) {
       console.error('Error fetching students:', error);
-      Alert.alert('Error', 'Failed to load students');
+      toast.error('Failed to load students');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -57,82 +63,69 @@ export default function StudentsScreen() {
   };
 
   const activateBulk = async () => {
-    if (selectedIds.size === 0) return;
+    if (selectedIds.size === 0) {
+      toast.warning('No students selected');
+      return;
+    }
 
-    Alert.alert(
-      'Activate Students',
-      `Activate ${selectedIds.size} student(s)?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Activate',
-          onPress: async () => {
-            try {
-              setRefreshing(true);
-              const selectedCount = selectedIds.size;
-              
-              // Activate all selected students
-              const promises = Array.from(selectedIds).map(uid => 
-                UserService.updateUser(uid, { isActive: true })
-              );
-              
-              await Promise.all(promises);
-              
-              // Refresh list
-              await fetchStudents();
-              setSelectedIds(new Set());
-              
-              Alert.alert('Success', `Activated ${selectedCount} student(s)`);
-            } catch (error) {
-              console.error('Error activating students:', error);
-              Alert.alert('Error', 'Failed to activate some students');
-            }
-          }
-        }
-      ]
-    );
+    try {
+      setRefreshing(true);
+      toast.info(`Activating ${selectedIds.size} student(s)...`);
+      const selectedCount = selectedIds.size;
+      
+      // Activate all selected students using AdminService
+      const result = await AdminService.grantAccessBulk(Array.from(selectedIds));
+      
+      // Refresh list
+      await fetchStudents();
+      setSelectedIds(new Set());
+      
+      if (result.failed > 0) {
+        toast.warning(`Activated ${result.success} student(s). ${result.failed} failed.`);
+      } else {
+        toast.success(`Activated ${selectedCount} student(s) successfully!`);
+      }
+    } catch (error) {
+      console.error('Error activating students:', error);
+      toast.error('Failed to activate students');
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const revokeBulk = async () => {
-    if (selectedIds.size === 0) return;
+    if (selectedIds.size === 0) {
+      toast.warning('No students selected');
+      return;
+    }
 
-    Alert.alert(
-      'Deactivate Students',
-      `Deactivate ${selectedIds.size} student(s)? They will lose access to the system.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Deactivate',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              setRefreshing(true);
-              const selectedCount = selectedIds.size;
-              
-              // Deactivate all selected students
-              const promises = Array.from(selectedIds).map(uid => 
-                UserService.deactivateUser(uid)
-              );
-              
-              await Promise.all(promises);
-              
-              // Refresh list
-              await fetchStudents();
-              setSelectedIds(new Set());
-              
-              Alert.alert('Success', `Deactivated ${selectedCount} student(s)`);
-            } catch (error) {
-              console.error('Error deactivating students:', error);
-              Alert.alert('Error', 'Failed to deactivate some students');
-            }
-          }
-        }
-      ]
-    );
+    try {
+      setRefreshing(true);
+      toast.info(`Deactivating ${selectedIds.size} student(s)...`);
+      const selectedCount = selectedIds.size;
+      
+      // Deactivate all selected students using AdminService
+      const result = await AdminService.revokeAccessBulk(Array.from(selectedIds));
+      
+      // Refresh list
+      await fetchStudents();
+      setSelectedIds(new Set());
+      
+      if (result.failed > 0) {
+        toast.warning(`Deactivated ${result.success} student(s). ${result.failed} failed.`);
+      } else {
+        toast.success(`Deactivated ${selectedCount} student(s) successfully!`);
+      }
+    } catch (error) {
+      console.error('Error deactivating students:', error);
+      toast.error('Failed to deactivate students');
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const filteredStudents = students.filter(s => {
-    const fullName = `${s.firstName} ${s.lastName}`.toLowerCase();
+    const fullName = `${s.FirstName} ${s.LastName}`.toLowerCase();
     const search = searchQuery.toLowerCase();
     return fullName.includes(search) ||
            s.email.toLowerCase().includes(search) ||
@@ -166,14 +159,23 @@ export default function StudentsScreen() {
         
         <View style={styles.actionButtons}>
           <Pressable
-            style={[styles.button, { backgroundColor: colors.primary }]}
+            style={({ pressed }) => [
+              styles.button,
+              { backgroundColor: colors.primary },
+              pressed && styles.buttonPressed
+            ]}
             onPress={() => router.push('/add-user?type=student')}
           >
             <ThemedText style={styles.buttonText}>+ Add Student</ThemedText>
           </Pressable>
           
           <Pressable
-            style={[styles.button, { backgroundColor: colors.secondary }]}
+            style={({ pressed }) => [
+              styles.button,
+              { backgroundColor: colors.secondary },
+              pressed && styles.buttonPressed,
+              (selectedIds.size === 0 || refreshing) && styles.buttonDisabled
+            ]}
             onPress={activateBulk}
             disabled={selectedIds.size === 0 || refreshing}
           >
@@ -183,7 +185,12 @@ export default function StudentsScreen() {
           </Pressable>
           
           <Pressable
-            style={[styles.button, { backgroundColor: colors.danger }]}
+            style={({ pressed }) => [
+              styles.button,
+              { backgroundColor: colors.danger },
+              pressed && styles.buttonPressed,
+              (selectedIds.size === 0 || refreshing) && styles.buttonDisabled
+            ]}
             onPress={revokeBulk}
             disabled={selectedIds.size === 0 || refreshing}
           >
@@ -193,7 +200,12 @@ export default function StudentsScreen() {
           </Pressable>
 
           <Pressable
-            style={[styles.button, { backgroundColor: colors.primary }]}
+            style={({ pressed }) => [
+              styles.button,
+              { backgroundColor: colors.primary },
+              pressed && styles.buttonPressed,
+              refreshing && styles.buttonDisabled
+            ]}
             onPress={fetchStudents}
             disabled={refreshing}
           >
@@ -246,7 +258,7 @@ export default function StudentsScreen() {
                   </View>
                   <View style={styles.cardInfo}>
                     <ThemedText style={styles.cardTitle}>
-                      {student.firstName} {student.lastName}
+                      {student.FirstName} {student.LastName}
                     </ThemedText>
                     <ThemedText style={styles.cardSubtitle}>{student.cardNumber}</ThemedText>
                   </View>
@@ -335,6 +347,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   buttonTextDisabled: {
+    opacity: 0.5,
+  },
+  buttonPressed: {
+    opacity: 0.7,
+  },
+  buttonDisabled: {
     opacity: 0.5,
   },
   content: {

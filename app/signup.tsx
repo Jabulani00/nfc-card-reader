@@ -1,5 +1,6 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { useToast } from '@/components/Toast';
 import { Colors } from '@/constants/colors';
 import { useAuth } from '@/contexts/AuthContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -15,10 +16,11 @@ export default function SignUpScreen() {
   const isDark = colorScheme === 'dark';
   const colors = Colors[colorScheme ?? 'light'];
   const { user, register, loading } = useAuth();
+  const toast = useToast();
   
   const [isStudent, setIsStudent] = useState(true);
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
+  const [FirstName, setFirstName] = useState('');
+  const [LastName, setLastName] = useState('');
   const [cardNumber, setCardNumber] = useState('');
   const [email, setEmail] = useState('');
   const [department, setDepartment] = useState('');
@@ -63,7 +65,7 @@ export default function SignUpScreen() {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       
       if (status !== 'granted') {
-        Alert.alert('Permission Denied', 'We need camera roll permissions to select a profile picture');
+        toast.warning('We need camera roll permissions to select a profile picture');
         return;
       }
 
@@ -81,53 +83,57 @@ export default function SignUpScreen() {
         if (asset.base64) {
           setImageBase64(`data:image/jpeg;base64,${asset.base64}`);
         }
+        toast.success('Profile picture selected');
       }
     } catch (error) {
       console.error('Error picking image:', error);
-      Alert.alert('Error', 'Failed to select image');
+      toast.error('Failed to select image');
     }
   };
 
   const handleSignUp = async () => {
     // Validation
-    if (!firstName || !lastName || !cardNumber || !email || !department || !password || !confirmPassword) {
-      Alert.alert('Error', 'Please fill in all required fields');
+    if (!FirstName || !LastName || !cardNumber || !email || !department || !password || !confirmPassword) {
+      toast.warning('Please fill in all required fields');
       return;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
+      toast.error('Passwords do not match');
       return;
     }
 
     if (password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
+      toast.error('Password must be at least 6 characters');
       return;
     }
 
     try {
+      toast.info('Creating account...');
       const role: UserRole = isStudent ? 'student' : 'staff';
       
       await register({
         email,
         password,
-        firstName,
-        lastName,
+        FirstName,
+        LastName,
         cardNumber,
         imageBase64,
         role,
         department,
       });
+      
+      toast.success('Registration successful! Pending approval.');
     } catch (error: any) {
       const errorMessage = error.message || 'Failed to create account';
       
       // Handle specific errors
       if (errorMessage.includes('Card number already exists')) {
-        Alert.alert('Duplicate Card Number', 'This card number is already registered');
+        toast.error('This card number is already registered');
       } else if (errorMessage.includes('email-already-in-use')) {
-        Alert.alert('Email Already Used', 'This email is already registered');
+        toast.error('This email is already registered');
       } else {
-        Alert.alert('Registration Failed', errorMessage);
+        toast.error(errorMessage);
       }
     }
   };
@@ -195,7 +201,7 @@ export default function SignUpScreen() {
                 ]}
                 placeholder="Enter your first name"
                 placeholderTextColor={colors.textTertiary}
-                value={firstName}
+                value={FirstName}
                 onChangeText={setFirstName}
                 editable={!loading}
               />
@@ -214,7 +220,7 @@ export default function SignUpScreen() {
                 ]}
                 placeholder="Enter your last name"
                 placeholderTextColor={colors.textTertiary}
-                value={lastName}
+                value={LastName}
                 onChangeText={setLastName}
                 editable={!loading}
               />

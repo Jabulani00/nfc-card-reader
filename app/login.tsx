@@ -1,11 +1,12 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { useToast } from '@/components/Toast';
 import { Colors } from '@/constants/colors';
 import { useAuth } from '@/contexts/AuthContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -13,6 +14,7 @@ export default function LoginScreen() {
   const isDark = colorScheme === 'dark';
   const colors = Colors[colorScheme ?? 'light'];
   const { user, login, loading } = useAuth();
+  const toast = useToast();
   
   const [cardNumber, setCardNumber] = useState('');
   const [password, setPassword] = useState('');
@@ -32,14 +34,16 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (!cardNumber || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
+      toast.warning('Please fill in all fields');
       return;
     }
 
     try {
+      toast.info('Logging in...');
       await login({ cardNumber, password });
+      toast.success('Login successful!');
     } catch (error: any) {
-      Alert.alert('Login Failed', error.message || 'Invalid credentials');
+      toast.error(error.message || 'Invalid credentials');
     }
   };
 

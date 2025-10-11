@@ -1,15 +1,17 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { useToast } from '@/components/Toast';
 import { Colors } from '@/constants/colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { User } from '@/models/User';
-import { UserService } from '@/services/userService';
+import { AdminService } from '@/services/adminService';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
 export default function ApprovalsScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const toast = useToast();
   
   const [pendingUsers, setPendingUsers] = useState<User[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -21,11 +23,14 @@ export default function ApprovalsScreen() {
   const fetchPendingUsers = async () => {
     try {
       setLoading(true);
-      const users = await UserService.getPendingApprovals();
+      const users = await AdminService.getPendingApprovals();
       setPendingUsers(users);
+      if (!loading) {
+        toast.success('Pending approvals refreshed');
+      }
     } catch (error) {
       console.error('Error fetching pending approvals:', error);
-      Alert.alert('Error', 'Failed to load pending approvals');
+      toast.error('Failed to load pending approvals');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -55,83 +60,76 @@ export default function ApprovalsScreen() {
   };
 
   const approveSelected = async () => {
-    if (selectedIds.size === 0) return;
+    console.log('Approve button clicked, selected:', selectedIds.size);
+    if (selectedIds.size === 0) {
+      toast.warning('No users selected');
+      return;
+    }
     
-    Alert.alert(
-      'Approve Users',
-      `Approve ${selectedIds.size} user(s)? They will be able to access the system.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Approve',
-          onPress: async () => {
-            try {
-              setRefreshing(true);
-              const selectedCount = selectedIds.size;
-              
-              // Approve all selected users
-              const promises = Array.from(selectedIds).map(uid => 
-                UserService.approveUser(uid)
-              );
-              
-              await Promise.all(promises);
-              
-              // Refresh list
-              await fetchPendingUsers();
-              setSelectedIds(new Set());
-              
-              Alert.alert('Success', `Approved ${selectedCount} user(s)`);
-            } catch (error) {
-              console.error('Error approving users:', error);
-              Alert.alert('Error', 'Failed to approve some users');
-            }
-          }
-        }
-      ]
-    );
+    try {
+      setRefreshing(true);
+      toast.info(`Approving ${selectedIds.size} user(s)...`);
+      const selectedCount = selectedIds.size;
+      
+      // Approve all selected users using AdminService
+      const result = await AdminService.approveBulk(Array.from(selectedIds));
+      
+      // Refresh list
+      await fetchPendingUsers();
+      setSelectedIds(new Set());
+      
+      if (result.failed > 0) {
+        toast.warning(`Approved ${result.success} user(s). ${result.failed} failed.`);
+      } else {
+        toast.success(`Approved ${selectedCount} user(s) successfully!`);
+      }
+    } catch (error) {
+      console.error('Error approving users:', error);
+      toast.error('Failed to approve users');
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const rejectSelected = async () => {
-    if (selectedIds.size === 0) return;
+    console.log('Reject button clicked, selected:', selectedIds.size);
+    if (selectedIds.size === 0) {
+      toast.warning('No users selected');
+      return;
+    }
     
-    Alert.alert(
-      'Reject Users',
-      `Reject ${selectedIds.size} user(s)? Their accounts will be deactivated.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Reject',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              setRefreshing(true);
-              const selectedCount = selectedIds.size;
-              
-              // Deactivate all selected users
-              const promises = Array.from(selectedIds).map(uid => 
-                UserService.deactivateUser(uid)
-              );
-              
-              await Promise.all(promises);
-              
-              // Refresh list
-              await fetchPendingUsers();
-              setSelectedIds(new Set());
-              
-              Alert.alert('Success', `Rejected ${selectedCount} user(s)`);
-            } catch (error) {
-              console.error('Error rejecting users:', error);
-              Alert.alert('Error', 'Failed to reject some users');
-            }
-          }
-        }
-      ]
-    );
+    try {
+      setRefreshing(true);
+      toast.info(`Rejecting ${selectedIds.size} user(s)...`);
+      const selectedCount = selectedIds.size;
+      
+      // Reject all selected users using AdminService
+      const result = await AdminService.rejectBulk(Array.from(selectedIds));
+      
+      // Refresh list
+      await fetchPendingUsers();
+      setSelectedIds(new Set());
+      
+      if (result.failed > 0) {
+        toast.warning(`Rejected ${result.success} user(s). ${result.failed} failed.`);
+      } else {
+        toast.success(`Rejected ${selectedCount} user(s) successfully!`);
+      }
+    } catch (error) {
+      console.error('Error rejecting users:', error);
+      toast.error('Failed to reject users');
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const revokeAll = async () => {
-    if (pendingUsers.length === 0) return;
-    
+    console.log('Revoke All button clicked, pending users:', pendingUsers.length);
+    if (pendingUsers.length === 0) {
+      toast.warning('No pending users to reject');
+      return;
+    }
+
     Alert.alert(
       'Reject All Users',
       'Are you sure you want to reject all pending registrations?',
@@ -143,23 +141,28 @@ export default function ApprovalsScreen() {
           onPress: async () => {
             try {
               setRefreshing(true);
+              toast.info(`Rejecting ${pendingUsers.length} user(s)...`);
               const count = pendingUsers.length;
               
-              // Deactivate all pending users
-              const promises = pendingUsers.map(user => 
-                UserService.deactivateUser(user.uid)
+              // Reject all pending users using AdminService
+              const result = await AdminService.rejectBulk(
+                pendingUsers.map(user => user.uid)
               );
-              
-              await Promise.all(promises);
               
               // Refresh list
               await fetchPendingUsers();
               setSelectedIds(new Set());
               
-              Alert.alert('Success', `Rejected ${count} pending user(s)`);
+              if (result.failed > 0) {
+                toast.warning(`Rejected ${result.success} user(s). ${result.failed} failed.`);
+              } else {
+                toast.success(`Rejected ${count} pending user(s) successfully!`);
+              }
             } catch (error) {
               console.error('Error rejecting all users:', error);
-              Alert.alert('Error', 'Failed to reject all users');
+              toast.error('Failed to reject all users');
+            } finally {
+              setRefreshing(false);
             }
           }
         }
@@ -168,7 +171,7 @@ export default function ApprovalsScreen() {
   };
 
   const filteredUsers = pendingUsers.filter(u => {
-    const fullName = `${u.firstName} ${u.lastName}`.toLowerCase();
+    const fullName = `${u.FirstName} ${u.LastName}`.toLowerCase();
     const search = searchQuery.toLowerCase();
     return fullName.includes(search) ||
            u.email.toLowerCase().includes(search) ||
@@ -202,7 +205,12 @@ export default function ApprovalsScreen() {
         
         <View style={styles.actionButtons}>
           <Pressable
-            style={[styles.button, { backgroundColor: colors.secondary }]}
+            style={({ pressed }) => [
+              styles.button,
+              { backgroundColor: colors.secondary },
+              pressed && styles.buttonPressed,
+              (selectedIds.size === 0 || refreshing) && styles.buttonDisabled
+            ]}
             onPress={approveSelected}
             disabled={selectedIds.size === 0 || refreshing}
           >
@@ -212,7 +220,12 @@ export default function ApprovalsScreen() {
           </Pressable>
           
           <Pressable
-            style={[styles.button, { backgroundColor: colors.warning }]}
+            style={({ pressed }) => [
+              styles.button,
+              { backgroundColor: colors.warning },
+              pressed && styles.buttonPressed,
+              (selectedIds.size === 0 || refreshing) && styles.buttonDisabled
+            ]}
             onPress={rejectSelected}
             disabled={selectedIds.size === 0 || refreshing}
           >
@@ -222,7 +235,12 @@ export default function ApprovalsScreen() {
           </Pressable>
           
           <Pressable
-            style={[styles.button, { backgroundColor: colors.danger }]}
+            style={({ pressed }) => [
+              styles.button,
+              { backgroundColor: colors.danger },
+              pressed && styles.buttonPressed,
+              (pendingUsers.length === 0 || refreshing) && styles.buttonDisabled
+            ]}
             onPress={revokeAll}
             disabled={pendingUsers.length === 0 || refreshing}
           >
@@ -232,7 +250,12 @@ export default function ApprovalsScreen() {
           </Pressable>
 
           <Pressable
-            style={[styles.button, { backgroundColor: colors.primary }]}
+            style={({ pressed }) => [
+              styles.button,
+              { backgroundColor: colors.primary },
+              pressed && styles.buttonPressed,
+              refreshing && styles.buttonDisabled
+            ]}
             onPress={fetchPendingUsers}
             disabled={refreshing}
           >
@@ -285,7 +308,7 @@ export default function ApprovalsScreen() {
                   </View>
                   <View style={styles.cardInfo}>
                     <ThemedText style={styles.cardTitle}>
-                      {user.firstName} {user.lastName}
+                      {user.FirstName} {user.LastName}
                     </ThemedText>
                     <ThemedText style={styles.cardSubtitle}>{user.cardNumber}</ThemedText>
                   </View>
@@ -351,6 +374,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   buttonTextDisabled: {
+    opacity: 0.5,
+  },
+  buttonPressed: {
+    opacity: 0.7,
+  },
+  buttonDisabled: {
     opacity: 0.5,
   },
   content: {

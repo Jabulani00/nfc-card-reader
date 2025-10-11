@@ -1,12 +1,12 @@
 import { auth } from '@/config/firebase';
 import { CreateUserData, LoginCredentials } from '@/models/User';
 import {
-    createUserWithEmailAndPassword,
-    User as FirebaseUser,
-    sendPasswordResetEmail,
-    signInWithEmailAndPassword,
-    signOut,
-    updateProfile
+  createUserWithEmailAndPassword,
+  User as FirebaseUser,
+  sendPasswordResetEmail,
+  signInWithEmailAndPassword,
+  signOut,
+  updateProfile
 } from 'firebase/auth';
 
 export class AuthService {
@@ -23,7 +23,7 @@ export class AuthService {
 
       // Update display name
       await updateProfile(userCredential.user, {
-        displayName: `${userData.firstName} ${userData.lastName}`
+        displayName: `${userData.FirstName} ${userData.LastName}`
       });
 
       return userCredential.user;

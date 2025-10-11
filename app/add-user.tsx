@@ -15,8 +15,8 @@ export default function AddUserScreen() {
   const initialType = params.type === 'staff' ? false : true;
   
   const [isStudent, setIsStudent] = useState(initialType);
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
+  const [FirstName, setFirstName] = useState('');
+  const [LastName, setLastName] = useState('');
   const [cardNumber, setCardNumber] = useState('');
   const [email, setEmail] = useState('');
   const [department, setDepartment] = useState('');
@@ -25,7 +25,7 @@ export default function AddUserScreen() {
 
   const handleAddUser = () => {
     // Validation
-    if (!firstName || !lastName || !cardNumber || !email || !department || !password) {
+    if (!FirstName || !LastName || !cardNumber || !email || !department || !password) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
@@ -38,7 +38,7 @@ export default function AddUserScreen() {
     // Simulate adding user
     Alert.alert(
       'Success',
-      `${isStudent ? 'Student' : 'Staff member'} "${firstName} ${lastName}" has been added successfully.`,
+      `${isStudent ? 'Student' : 'Staff member'} "${FirstName} ${LastName}" has been added successfully.`,
       [
         {
           text: 'OK',
@@ -92,7 +92,7 @@ export default function AddUserScreen() {
                 ]}
                 placeholder="Enter first name"
                 placeholderTextColor={colors.textTertiary}
-                value={firstName}
+                value={FirstName}
                 onChangeText={setFirstName}
               />
             </View>
@@ -111,7 +111,7 @@ export default function AddUserScreen() {
                 ]}
                 placeholder="Enter last name"
                 placeholderTextColor={colors.textTertiary}
-                value={lastName}
+                value={LastName}
                 onChangeText={setLastName}
               />
             </View>

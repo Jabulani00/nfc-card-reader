@@ -1,17 +1,19 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { useToast } from '@/components/Toast';
 import { Colors } from '@/constants/colors';
 import { useAuth } from '@/contexts/AuthContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { User } from '@/models/User';
-import { UserService } from '@/services/userService';
+import { StaffService } from '@/services/staffService';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
 export default function StaffStudentsScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { user } = useAuth();
+  const toast = useToast();
   
   const [students, setStudents] = useState<User[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -23,14 +25,20 @@ export default function StaffStudentsScreen() {
   const fetchDepartmentStudents = async () => {
     try {
       setLoading(true);
-      // Get all students
-      const allStudents = await UserService.getUsersByRole('student');
-      // Filter by department
-      const departmentStudents = allStudents.filter(s => s.department === user?.department);
+      if (!user) {
+        toast.error('User session expired');
+        return;
+      }
+      
+      // Use StaffService to get department students
+      const departmentStudents = await StaffService.getDepartmentStudents(user);
       setStudents(departmentStudents);
+      if (!loading) {
+        toast.success('Department students refreshed');
+      }
     } catch (error) {
       console.error('Error fetching students:', error);
-      Alert.alert('Error', 'Failed to load students');
+      toast.error('Failed to load students');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -62,119 +70,127 @@ export default function StaffStudentsScreen() {
   };
 
   const approveStudents = async () => {
-    if (selectedIds.size === 0) return;
+    if (selectedIds.size === 0) {
+      toast.warning('No students selected');
+      return;
+    }
 
-    Alert.alert(
-      'Approve Students',
-      `Approve ${selectedIds.size} student(s)? They will be able to access the system.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Approve',
-          onPress: async () => {
-            try {
-              setRefreshing(true);
-              const selectedCount = selectedIds.size;
-              
-              // Approve all selected students
-              const promises = Array.from(selectedIds).map(uid => 
-                UserService.approveUser(uid)
-              );
-              
-              await Promise.all(promises);
-              
-              // Refresh list
-              await fetchDepartmentStudents();
-              setSelectedIds(new Set());
-              
-              Alert.alert('Success', `Approved ${selectedCount} student(s)`);
-            } catch (error) {
-              console.error('Error approving students:', error);
-              Alert.alert('Error', 'Failed to approve some students');
-            }
-          }
-        }
-      ]
-    );
+    try {
+      setRefreshing(true);
+      const selectedCount = selectedIds.size;
+      
+      if (!user) {
+        toast.error('User session expired');
+        return;
+      }
+      
+      toast.info(`Approving ${selectedCount} student(s)...`);
+      
+      // Approve all selected students using StaffService
+      const result = await StaffService.approveStudentsBulk(
+        user,
+        Array.from(selectedIds)
+      );
+      
+      // Refresh list
+      await fetchDepartmentStudents();
+      setSelectedIds(new Set());
+      
+      if (result.failed > 0) {
+        toast.warning(`Approved ${result.success} student(s). ${result.failed} failed or not in your department.`);
+      } else {
+        toast.success(`Approved ${selectedCount} student(s) successfully!`);
+      }
+    } catch (error: any) {
+      console.error('Error approving students:', error);
+      toast.error(error.message || 'Failed to approve students');
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const activateBulk = async () => {
-    if (selectedIds.size === 0) return;
+    if (selectedIds.size === 0) {
+      toast.warning('No students selected');
+      return;
+    }
 
-    Alert.alert(
-      'Activate Students',
-      `Activate ${selectedIds.size} student(s)?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Activate',
-          onPress: async () => {
-            try {
-              setRefreshing(true);
-              const selectedCount = selectedIds.size;
-              
-              // Activate all selected students
-              const promises = Array.from(selectedIds).map(uid => 
-                UserService.updateUser(uid, { isActive: true })
-              );
-              
-              await Promise.all(promises);
-              
-              // Refresh list
-              await fetchDepartmentStudents();
-              setSelectedIds(new Set());
-              
-              Alert.alert('Success', `Activated ${selectedCount} student(s)`);
-            } catch (error) {
-              console.error('Error activating students:', error);
-              Alert.alert('Error', 'Failed to activate some students');
-            }
-          }
-        }
-      ]
-    );
+    try {
+      setRefreshing(true);
+      const selectedCount = selectedIds.size;
+      
+      if (!user) {
+        toast.error('User session expired');
+        return;
+      }
+      
+      toast.info(`Activating ${selectedCount} student(s)...`);
+      
+      // Activate all selected students using StaffService
+      const result = await StaffService.activateStudentsBulk(
+        user,
+        Array.from(selectedIds)
+      );
+      
+      // Refresh list
+      await fetchDepartmentStudents();
+      setSelectedIds(new Set());
+      
+      if (result.failed > 0) {
+        toast.warning(`Activated ${result.success} student(s). ${result.failed} failed or not in your department.`);
+      } else {
+        toast.success(`Activated ${selectedCount} student(s) successfully!`);
+      }
+    } catch (error: any) {
+      console.error('Error activating students:', error);
+      toast.error(error.message || 'Failed to activate students');
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const revokeBulk = async () => {
-    if (selectedIds.size === 0) return;
+    if (selectedIds.size === 0) {
+      toast.warning('No students selected');
+      return;
+    }
 
-    Alert.alert(
-      'Deactivate Students',
-      `Deactivate ${selectedIds.size} student(s)? They will lose access to the system.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Deactivate',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              setRefreshing(true);
-              const selectedCount = selectedIds.size;
-              
-              // Deactivate all selected students
-              const promises = Array.from(selectedIds).map(uid => 
-                UserService.deactivateUser(uid)
-              );
-              
-              await Promise.all(promises);
-              
-              // Refresh list
-              await fetchDepartmentStudents();
-              setSelectedIds(new Set());
-              
-              Alert.alert('Success', `Deactivated ${selectedCount} student(s)`);
-            } catch (error) {
-              console.error('Error deactivating students:', error);
-              Alert.alert('Error', 'Failed to deactivate some students');
-            }
-          }
-        }
-      ]
-    );
+    try {
+      setRefreshing(true);
+      const selectedCount = selectedIds.size;
+      
+      if (!user) {
+        toast.error('User session expired');
+        return;
+      }
+      
+      toast.info(`Deactivating ${selectedCount} student(s)...`);
+      
+      // Deactivate all selected students using StaffService
+      const result = await StaffService.deactivateStudentsBulk(
+        user,
+        Array.from(selectedIds)
+      );
+      
+      // Refresh list
+      await fetchDepartmentStudents();
+      setSelectedIds(new Set());
+      
+      if (result.failed > 0) {
+        toast.warning(`Deactivated ${result.success} student(s). ${result.failed} failed or not in your department.`);
+      } else {
+        toast.success(`Deactivated ${selectedCount} student(s) successfully!`);
+      }
+    } catch (error: any) {
+      console.error('Error deactivating students:', error);
+      toast.error(error.message || 'Failed to deactivate students');
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const filteredStudents = students.filter(s => {
-    const fullName = `${s.firstName} ${s.lastName}`.toLowerCase();
+    const fullName = `${s.FirstName} ${s.LastName}`.toLowerCase();
     const search = searchQuery.toLowerCase();
     return fullName.includes(search) ||
            s.email.toLowerCase().includes(search) ||
@@ -222,7 +238,12 @@ export default function StaffStudentsScreen() {
         
         <View style={styles.actionButtons}>
           <Pressable
-            style={[styles.button, { backgroundColor: colors.info }]}
+            style={({ pressed }) => [
+              styles.button,
+              { backgroundColor: colors.info },
+              pressed && styles.buttonPressed,
+              (selectedIds.size === 0 || refreshing) && styles.buttonDisabled
+            ]}
             onPress={approveStudents}
             disabled={selectedIds.size === 0 || refreshing}
           >
@@ -232,7 +253,12 @@ export default function StaffStudentsScreen() {
           </Pressable>
 
           <Pressable
-            style={[styles.button, { backgroundColor: colors.success }]}
+            style={({ pressed }) => [
+              styles.button,
+              { backgroundColor: colors.success },
+              pressed && styles.buttonPressed,
+              (selectedIds.size === 0 || refreshing) && styles.buttonDisabled
+            ]}
             onPress={activateBulk}
             disabled={selectedIds.size === 0 || refreshing}
           >
@@ -242,7 +268,12 @@ export default function StaffStudentsScreen() {
           </Pressable>
           
           <Pressable
-            style={[styles.button, { backgroundColor: colors.danger }]}
+            style={({ pressed }) => [
+              styles.button,
+              { backgroundColor: colors.danger },
+              pressed && styles.buttonPressed,
+              (selectedIds.size === 0 || refreshing) && styles.buttonDisabled
+            ]}
             onPress={revokeBulk}
             disabled={selectedIds.size === 0 || refreshing}
           >
@@ -252,7 +283,12 @@ export default function StaffStudentsScreen() {
           </Pressable>
 
           <Pressable
-            style={[styles.button, { backgroundColor: colors.secondary }]}
+            style={({ pressed }) => [
+              styles.button,
+              { backgroundColor: colors.secondary },
+              pressed && styles.buttonPressed,
+              refreshing && styles.buttonDisabled
+            ]}
             onPress={fetchDepartmentStudents}
             disabled={refreshing}
           >
@@ -305,7 +341,7 @@ export default function StaffStudentsScreen() {
                   </View>
                   <View style={styles.cardInfo}>
                     <ThemedText style={styles.cardTitle}>
-                      {student.firstName} {student.lastName}
+                      {student.FirstName} {student.LastName}
                     </ThemedText>
                     <ThemedText style={styles.cardSubtitle}>{student.cardNumber}</ThemedText>
                   </View>
@@ -433,6 +469,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   buttonTextDisabled: {
+    opacity: 0.5,
+  },
+  buttonPressed: {
+    opacity: 0.7,
+  },
+  buttonDisabled: {
     opacity: 0.5,
   },
   content: {

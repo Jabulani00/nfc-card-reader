@@ -1,17 +1,20 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { useToast } from '@/components/Toast';
 import { Colors } from '@/constants/colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { User } from '@/models/User';
+import { AdminService } from '@/services/adminService';
 import { UserService } from '@/services/userService';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
 export default function StaffScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const toast = useToast();
   
   const [staff, setStaff] = useState<User[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -25,9 +28,12 @@ export default function StaffScreen() {
       setLoading(true);
       const users = await UserService.getUsersByRole('staff');
       setStaff(users);
+      if (!loading) {
+        toast.success('Staff list refreshed');
+      }
     } catch (error) {
       console.error('Error fetching staff:', error);
-      Alert.alert('Error', 'Failed to load staff');
+      toast.error('Failed to load staff');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -57,107 +63,89 @@ export default function StaffScreen() {
   };
 
   const activateBulk = async () => {
-    if (selectedIds.size === 0) return;
+    if (selectedIds.size === 0) {
+      toast.warning('No staff members selected');
+      return;
+    }
 
-    Alert.alert(
-      'Activate Staff',
-      `Activate ${selectedIds.size} staff member(s)?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Activate',
-          onPress: async () => {
-            try {
-              setRefreshing(true);
-              const selectedCount = selectedIds.size;
-              
-              // Activate all selected staff
-              const promises = Array.from(selectedIds).map(uid => 
-                UserService.updateUser(uid, { isActive: true })
-              );
-              
-              await Promise.all(promises);
-              
-              // Refresh list
-              await fetchStaff();
-              setSelectedIds(new Set());
-              
-              Alert.alert('Success', `Activated ${selectedCount} staff member(s)`);
-            } catch (error) {
-              console.error('Error activating staff:', error);
-              Alert.alert('Error', 'Failed to activate some staff members');
-            }
-          }
-        }
-      ]
-    );
+    try {
+      setRefreshing(true);
+      toast.info(`Activating ${selectedIds.size} staff member(s)...`);
+      const selectedCount = selectedIds.size;
+      
+      // Activate all selected staff using AdminService
+      const result = await AdminService.grantAccessBulk(Array.from(selectedIds));
+      
+      // Refresh list
+      await fetchStaff();
+      setSelectedIds(new Set());
+      
+      if (result.failed > 0) {
+        toast.warning(`Activated ${result.success} staff member(s). ${result.failed} failed.`);
+      } else {
+        toast.success(`Activated ${selectedCount} staff member(s) successfully!`);
+      }
+    } catch (error) {
+      console.error('Error activating staff:', error);
+      toast.error('Failed to activate staff');
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const revokeBulk = async () => {
-    if (selectedIds.size === 0) return;
+    if (selectedIds.size === 0) {
+      toast.warning('No staff members selected');
+      return;
+    }
 
-    Alert.alert(
-      'Deactivate Staff',
-      `Deactivate ${selectedIds.size} staff member(s)? They will lose access to the system.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Deactivate',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              setRefreshing(true);
-              const selectedCount = selectedIds.size;
-              
-              // Deactivate all selected staff
-              const promises = Array.from(selectedIds).map(uid => 
-                UserService.deactivateUser(uid)
-              );
-              
-              await Promise.all(promises);
-              
-              // Refresh list
-              await fetchStaff();
-              setSelectedIds(new Set());
-              
-              Alert.alert('Success', `Deactivated ${selectedCount} staff member(s)`);
-            } catch (error) {
-              console.error('Error deactivating staff:', error);
-              Alert.alert('Error', 'Failed to deactivate some staff members');
-            }
-          }
-        }
-      ]
-    );
+    try {
+      setRefreshing(true);
+      toast.info(`Deactivating ${selectedIds.size} staff member(s)...`);
+      const selectedCount = selectedIds.size;
+      
+      // Deactivate all selected staff using AdminService
+      const result = await AdminService.revokeAccessBulk(Array.from(selectedIds));
+      
+      // Refresh list
+      await fetchStaff();
+      setSelectedIds(new Set());
+      
+      if (result.failed > 0) {
+        toast.warning(`Deactivated ${result.success} staff member(s). ${result.failed} failed.`);
+      } else {
+        toast.success(`Deactivated ${selectedCount} staff member(s) successfully!`);
+      }
+    } catch (error) {
+      console.error('Error deactivating staff:', error);
+      toast.error('Failed to deactivate staff');
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const toggleApprovalPermission = async (uid: string, canApprove: boolean) => {
-    Alert.alert(
-      'Update Permissions',
-      canApprove 
-        ? 'Grant this staff member permission to approve students?' 
-        : 'Remove student approval permissions from this staff member?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Confirm',
-          onPress: async () => {
-            try {
-              await UserService.updateStaffApprovalPermission(uid, canApprove);
-              await fetchStaff();
-              Alert.alert('Success', `Permissions updated successfully`);
-            } catch (error) {
-              console.error('Error updating permissions:', error);
-              Alert.alert('Error', 'Failed to update permissions');
-            }
-          }
-        }
-      ]
-    );
+    try {
+      toast.info(`${canApprove ? 'Granting' : 'Revoking'} approval rights...`);
+      
+      // Use AdminService to grant/revoke approval rights
+      if (canApprove) {
+        await AdminService.grantApprovalRights(uid);
+        toast.success('Approval rights granted successfully!');
+      } else {
+        await AdminService.revokeApprovalRights(uid);
+        toast.success('Approval rights revoked successfully!');
+      }
+      
+      await fetchStaff();
+    } catch (error: any) {
+      console.error('Error updating permissions:', error);
+      toast.error(error.message || 'Failed to update permissions');
+    }
   };
 
   const filteredStaff = staff.filter(s => {
-    const fullName = `${s.firstName} ${s.lastName}`.toLowerCase();
+    const fullName = `${s.FirstName} ${s.LastName}`.toLowerCase();
     const search = searchQuery.toLowerCase();
     return fullName.includes(search) ||
            s.email.toLowerCase().includes(search) ||
@@ -191,14 +179,23 @@ export default function StaffScreen() {
         
         <View style={styles.actionButtons}>
           <Pressable
-            style={[styles.button, { backgroundColor: colors.primary }]}
+            style={({ pressed }) => [
+              styles.button,
+              { backgroundColor: colors.primary },
+              pressed && styles.buttonPressed
+            ]}
             onPress={() => router.push('/add-user?type=staff')}
           >
             <ThemedText style={styles.buttonText}>+ Add Staff</ThemedText>
           </Pressable>
           
           <Pressable
-            style={[styles.button, { backgroundColor: colors.secondary }]}
+            style={({ pressed }) => [
+              styles.button,
+              { backgroundColor: colors.secondary },
+              pressed && styles.buttonPressed,
+              (selectedIds.size === 0 || refreshing) && styles.buttonDisabled
+            ]}
             onPress={activateBulk}
             disabled={selectedIds.size === 0 || refreshing}
           >
@@ -208,7 +205,12 @@ export default function StaffScreen() {
           </Pressable>
           
           <Pressable
-            style={[styles.button, { backgroundColor: colors.danger }]}
+            style={({ pressed }) => [
+              styles.button,
+              { backgroundColor: colors.danger },
+              pressed && styles.buttonPressed,
+              (selectedIds.size === 0 || refreshing) && styles.buttonDisabled
+            ]}
             onPress={revokeBulk}
             disabled={selectedIds.size === 0 || refreshing}
           >
@@ -218,7 +220,12 @@ export default function StaffScreen() {
           </Pressable>
 
           <Pressable
-            style={[styles.button, { backgroundColor: colors.primary }]}
+            style={({ pressed }) => [
+              styles.button,
+              { backgroundColor: colors.primary },
+              pressed && styles.buttonPressed,
+              refreshing && styles.buttonDisabled
+            ]}
             onPress={fetchStaff}
             disabled={refreshing}
           >
@@ -271,7 +278,7 @@ export default function StaffScreen() {
                   </View>
                   <View style={styles.cardInfo}>
                     <ThemedText style={styles.cardTitle}>
-                      {member.firstName} {member.lastName}
+                      {member.FirstName} {member.LastName}
                     </ThemedText>
                     <ThemedText style={styles.cardSubtitle}>{member.cardNumber}</ThemedText>
                   </View>
@@ -299,9 +306,11 @@ export default function StaffScreen() {
                 
                 {/* Toggle Approval Permission */}
                 <Pressable
-                  style={[styles.permissionButton, { 
-                    backgroundColor: member.canApproveStudents ? colors.warning : colors.success 
-                  }]}
+                  style={({ pressed }) => [
+                    styles.permissionButton,
+                    { backgroundColor: member.canApproveStudents ? colors.warning : colors.success },
+                    pressed && styles.permissionButtonPressed
+                  ]}
                   onPress={() => toggleApprovalPermission(member.uid, !member.canApproveStudents)}
                 >
                   <ThemedText style={styles.permissionButtonText}>
@@ -375,6 +384,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   buttonTextDisabled: {
+    opacity: 0.5,
+  },
+  buttonPressed: {
+    opacity: 0.7,
+  },
+  buttonDisabled: {
     opacity: 0.5,
   },
   content: {
@@ -459,6 +474,9 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '600',
+  },
+  permissionButtonPressed: {
+    opacity: 0.7,
   },
 });
 

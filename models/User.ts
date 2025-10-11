@@ -4,8 +4,8 @@ export interface User {
   uid: string;
   authUid: string;
   email: string;
-  firstName: string;
-  lastName: string;
+  FirstName: string;
+  LastName: string;
   cardNumber: string;
   nfcId?: string; // Optional - assigned by admin after approval
   imageUrl?: string;
@@ -21,8 +21,8 @@ export interface User {
 export interface CreateUserData {
   email: string;
   password: string;
-  firstName: string;
-  lastName: string;
+  FirstName: string;
+  LastName: string;
   cardNumber: string;
   imageBase64?: string;
   role: UserRole;

@@ -13,6 +13,7 @@ export interface User {
   department: string;
   isActive: boolean;
   isApproved: boolean;
+  canApproveStudents?: boolean; // Staff only - permission to approve students
   createdAt: Date;
   updatedAt: Date;
 }

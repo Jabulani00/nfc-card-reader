@@ -66,6 +66,11 @@ export class UserService {
         newUserData.imageUrl = imageUrl;
       }
 
+      // Set canApproveStudents to false by default for staff
+      if (userData.role === 'staff') {
+        newUserData.canApproveStudents = false;
+      }
+
       await setDoc(userRef, newUserData);
 
       return {
@@ -124,6 +129,7 @@ export class UserService {
         department: userData.department,
         isActive: userData.isActive,
         isApproved: userData.isApproved,
+        canApproveStudents: userData.canApproveStudents,
         createdAt: userData.createdAt?.toDate() || new Date(),
         updatedAt: userData.updatedAt?.toDate() || new Date(),
       };
@@ -159,6 +165,7 @@ export class UserService {
         department: userData.department,
         isActive: userData.isActive,
         isApproved: userData.isApproved,
+        canApproveStudents: userData.canApproveStudents,
         createdAt: userData.createdAt?.toDate() || new Date(),
         updatedAt: userData.updatedAt?.toDate() || new Date(),
       };
@@ -195,6 +202,7 @@ export class UserService {
           department: userData.department,
           isActive: userData.isActive,
           isApproved: userData.isApproved,
+          canApproveStudents: userData.canApproveStudents,
           createdAt: userData.createdAt?.toDate() || new Date(),
           updatedAt: userData.updatedAt?.toDate() || new Date(),
         };
@@ -233,6 +241,7 @@ export class UserService {
           department: userData.department,
           isActive: userData.isActive,
           isApproved: userData.isApproved,
+          canApproveStudents: userData.canApproveStudents,
           createdAt: userData.createdAt?.toDate() || new Date(),
           updatedAt: userData.updatedAt?.toDate() || new Date(),
         };
@@ -308,15 +317,17 @@ export class UserService {
    */
   static async getPendingApprovals(): Promise<User[]> {
     try {
+      // Query for users where isApproved is false
+      // Note: This requires a Firestore composite index on (isApproved, createdAt)
       const q = query(
         collection(db, USERS_COLLECTION),
-        where('isApproved', '==', false),
-        orderBy('createdAt', 'desc')
+        where('isApproved', '==', false)
       );
       
       const querySnapshot = await getDocs(q);
       
-      return querySnapshot.docs.map(doc => {
+      // Sort by createdAt on client side to avoid index requirement
+      const users = querySnapshot.docs.map(doc => {
         const userData = doc.data();
         return {
           uid: doc.id,
@@ -331,12 +342,17 @@ export class UserService {
           department: userData.department,
           isActive: userData.isActive,
           isApproved: userData.isApproved,
+          canApproveStudents: userData.canApproveStudents,
           createdAt: userData.createdAt?.toDate() || new Date(),
           updatedAt: userData.updatedAt?.toDate() || new Date(),
         };
       });
-    } catch (error) {
+
+      // Sort by createdAt descending
+      return users.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    } catch (error: any) {
       console.error('Error getting pending approvals:', error);
+      console.error('Error details:', error.message, error.code);
       throw new Error('Failed to fetch pending approvals');
     }
   }
@@ -409,12 +425,25 @@ export class UserService {
         department: userData.department,
         isActive: userData.isActive,
         isApproved: userData.isApproved,
+        canApproveStudents: userData.canApproveStudents,
         createdAt: userData.createdAt?.toDate() || new Date(),
         updatedAt: userData.updatedAt?.toDate() || new Date(),
       };
     } catch (error) {
       console.error('Error getting user by NFC ID:', error);
       throw new Error('Failed to fetch user by NFC ID');
+    }
+  }
+
+  /**
+   * Update staff approval permissions (admin only)
+   */
+  static async updateStaffApprovalPermission(uid: string, canApproveStudents: boolean): Promise<void> {
+    try {
+      await this.updateUser(uid, { canApproveStudents });
+    } catch (error) {
+      console.error('Error updating staff approval permission:', error);
+      throw new Error('Failed to update staff permissions');
     }
   }
 
@@ -454,6 +483,7 @@ export class UserService {
         department: userData.department,
         isActive: userData.isActive,
         isApproved: userData.isApproved,
+        canApproveStudents: userData.canApproveStudents,
         createdAt: userData.createdAt?.toDate() || new Date(),
         updatedAt: userData.updatedAt?.toDate() || new Date(),
       };

@@ -1,37 +1,47 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/colors';
+import { useAuth } from '@/contexts/AuthContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
-
-interface Student {
-  id: string;
-  name: string;
-  email: string;
-  studentNumber: string;
-  department: string;
-  isActive: boolean;
-  hasAccessCard: boolean;
-}
-
-// Mock data - Staff can only see their department's students
-const STAFF_DEPARTMENT = 'Computer Science'; // This would come from auth/context
-
-const mockStudents: Student[] = [
-  { id: '1', name: 'John Doe', email: 'john@university.edu', studentNumber: 'ST001', department: 'Computer Science', isActive: false, hasAccessCard: true },
-  { id: '2', name: 'Jane Smith', email: 'jane@university.edu', studentNumber: 'ST002', department: 'Computer Science', isActive: true, hasAccessCard: true },
-  { id: '5', name: 'Alex Brown', email: 'alex@university.edu', studentNumber: 'ST005', department: 'Computer Science', isActive: false, hasAccessCard: false },
-  { id: '6', name: 'Emma Wilson', email: 'emma@university.edu', studentNumber: 'ST006', department: 'Computer Science', isActive: true, hasAccessCard: true },
-];
+import { User } from '@/models/User';
+import { UserService } from '@/services/userService';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
 export default function StaffStudentsScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const { user } = useAuth();
   
-  const [students, setStudents] = useState<Student[]>(mockStudents);
+  const [students, setStudents] = useState<User[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Fetch students from staff's department
+  const fetchDepartmentStudents = async () => {
+    try {
+      setLoading(true);
+      // Get all students
+      const allStudents = await UserService.getUsersByRole('student');
+      // Filter by department
+      const departmentStudents = allStudents.filter(s => s.department === user?.department);
+      setStudents(departmentStudents);
+    } catch (error) {
+      console.error('Error fetching students:', error);
+      Alert.alert('Error', 'Failed to load students');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user?.department) {
+      fetchDepartmentStudents();
+    }
+  }, [user?.department]);
 
   const toggleSelection = (id: string) => {
     const newSelected = new Set(selectedIds);
@@ -47,40 +57,138 @@ export default function StaffStudentsScreen() {
     if (selectedIds.size === filteredStudents.length) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(filteredStudents.map(s => s.id)));
+      setSelectedIds(new Set(filteredStudents.map(s => s.uid)));
     }
   };
 
-  const grantAccessBulk = () => {
-    const studentsToGrant = students.filter(s => 
-      selectedIds.has(s.id) && s.hasAccessCard && !s.isActive
+  const approveStudents = async () => {
+    if (selectedIds.size === 0) return;
+
+    Alert.alert(
+      'Approve Students',
+      `Approve ${selectedIds.size} student(s)? They will be able to access the system.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Approve',
+          onPress: async () => {
+            try {
+              setRefreshing(true);
+              const selectedCount = selectedIds.size;
+              
+              // Approve all selected students
+              const promises = Array.from(selectedIds).map(uid => 
+                UserService.approveUser(uid)
+              );
+              
+              await Promise.all(promises);
+              
+              // Refresh list
+              await fetchDepartmentStudents();
+              setSelectedIds(new Set());
+              
+              Alert.alert('Success', `Approved ${selectedCount} student(s)`);
+            } catch (error) {
+              console.error('Error approving students:', error);
+              Alert.alert('Error', 'Failed to approve some students');
+            }
+          }
+        }
+      ]
     );
-    
-    if (studentsToGrant.length === 0) {
-      Alert.alert('Info', 'No eligible students selected. Students must have registered access cards.');
-      return;
-    }
-
-    setStudents(students.map(s => 
-      selectedIds.has(s.id) && s.hasAccessCard ? { ...s, isActive: true } : s
-    ));
-    setSelectedIds(new Set());
-    Alert.alert('Success', `Granted access to ${studentsToGrant.length} student(s)`);
   };
 
-  const revokeBulk = () => {
-    setStudents(students.map(s => 
-      selectedIds.has(s.id) ? { ...s, isActive: false } : s
-    ));
-    setSelectedIds(new Set());
-    Alert.alert('Success', `Revoked access for ${selectedIds.size} student(s)`);
+  const activateBulk = async () => {
+    if (selectedIds.size === 0) return;
+
+    Alert.alert(
+      'Activate Students',
+      `Activate ${selectedIds.size} student(s)?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Activate',
+          onPress: async () => {
+            try {
+              setRefreshing(true);
+              const selectedCount = selectedIds.size;
+              
+              // Activate all selected students
+              const promises = Array.from(selectedIds).map(uid => 
+                UserService.updateUser(uid, { isActive: true })
+              );
+              
+              await Promise.all(promises);
+              
+              // Refresh list
+              await fetchDepartmentStudents();
+              setSelectedIds(new Set());
+              
+              Alert.alert('Success', `Activated ${selectedCount} student(s)`);
+            } catch (error) {
+              console.error('Error activating students:', error);
+              Alert.alert('Error', 'Failed to activate some students');
+            }
+          }
+        }
+      ]
+    );
   };
 
-  const filteredStudents = students.filter(s => 
-    s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    s.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    s.studentNumber.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const revokeBulk = async () => {
+    if (selectedIds.size === 0) return;
+
+    Alert.alert(
+      'Deactivate Students',
+      `Deactivate ${selectedIds.size} student(s)? They will lose access to the system.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Deactivate',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setRefreshing(true);
+              const selectedCount = selectedIds.size;
+              
+              // Deactivate all selected students
+              const promises = Array.from(selectedIds).map(uid => 
+                UserService.deactivateUser(uid)
+              );
+              
+              await Promise.all(promises);
+              
+              // Refresh list
+              await fetchDepartmentStudents();
+              setSelectedIds(new Set());
+              
+              Alert.alert('Success', `Deactivated ${selectedCount} student(s)`);
+            } catch (error) {
+              console.error('Error deactivating students:', error);
+              Alert.alert('Error', 'Failed to deactivate some students');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const filteredStudents = students.filter(s => {
+    const fullName = `${s.firstName} ${s.lastName}`.toLowerCase();
+    const search = searchQuery.toLowerCase();
+    return fullName.includes(search) ||
+           s.email.toLowerCase().includes(search) ||
+           s.cardNumber.toLowerCase().includes(search);
+  });
+
+  if (loading) {
+    return (
+      <ThemedView style={[styles.container, styles.centerContent]}>
+        <ActivityIndicator size="large" color={colors.secondary} />
+        <ThemedText style={{ marginTop: 16 }}>Loading students...</ThemedText>
+      </ThemedView>
+    );
+  }
 
   return (
     <ThemedView style={styles.container}>
@@ -89,7 +197,9 @@ export default function StaffStudentsScreen() {
         <ThemedText style={styles.bannerIcon}>🏢</ThemedText>
         <View style={styles.bannerInfo}>
           <ThemedText style={styles.bannerTitle}>Your Department</ThemedText>
-          <ThemedText style={[styles.bannerDepartment, { color: colors.secondary }]}>{STAFF_DEPARTMENT}</ThemedText>
+          <ThemedText style={[styles.bannerDepartment, { color: colors.secondary }]}>
+            {user?.department || 'N/A'}
+          </ThemedText>
         </View>
         <View style={[styles.countBadge, { backgroundColor: colors.secondary }]}>
           <ThemedText style={styles.countBadgeText}>{students.length}</ThemedText>
@@ -112,85 +222,118 @@ export default function StaffStudentsScreen() {
         
         <View style={styles.actionButtons}>
           <Pressable
-            style={[styles.button, { backgroundColor: colors.success }]}
-            onPress={grantAccessBulk}
-            disabled={selectedIds.size === 0}
+            style={[styles.button, { backgroundColor: colors.info }]}
+            onPress={approveStudents}
+            disabled={selectedIds.size === 0 || refreshing}
           >
-            <ThemedText style={[styles.buttonText, selectedIds.size === 0 && styles.buttonTextDisabled]}>
-              ✓ Grant Access ({selectedIds.size})
+            <ThemedText style={[styles.buttonText, (selectedIds.size === 0 || refreshing) && styles.buttonTextDisabled]}>
+              {refreshing ? '...' : `✓ Approve (${selectedIds.size})`}
+            </ThemedText>
+          </Pressable>
+
+          <Pressable
+            style={[styles.button, { backgroundColor: colors.success }]}
+            onPress={activateBulk}
+            disabled={selectedIds.size === 0 || refreshing}
+          >
+            <ThemedText style={[styles.buttonText, (selectedIds.size === 0 || refreshing) && styles.buttonTextDisabled]}>
+              {refreshing ? '...' : `Activate (${selectedIds.size})`}
             </ThemedText>
           </Pressable>
           
           <Pressable
             style={[styles.button, { backgroundColor: colors.danger }]}
             onPress={revokeBulk}
-            disabled={selectedIds.size === 0}
+            disabled={selectedIds.size === 0 || refreshing}
           >
-            <ThemedText style={[styles.buttonText, selectedIds.size === 0 && styles.buttonTextDisabled]}>
-              ✕ Revoke ({selectedIds.size})
+            <ThemedText style={[styles.buttonText, (selectedIds.size === 0 || refreshing) && styles.buttonTextDisabled]}>
+              {refreshing ? '...' : `Revoke (${selectedIds.size})`}
+            </ThemedText>
+          </Pressable>
+
+          <Pressable
+            style={[styles.button, { backgroundColor: colors.secondary }]}
+            onPress={fetchDepartmentStudents}
+            disabled={refreshing}
+          >
+            <ThemedText style={[styles.buttonText, refreshing && styles.buttonTextDisabled]}>
+              🔄 Refresh
             </ThemedText>
           </Pressable>
         </View>
       </View>
 
       <ScrollView style={styles.content}>
-        {/* Select All */}
-        <Pressable
-          style={[styles.selectAllRow, { backgroundColor: colors.backgroundSecondary }]}
-          onPress={selectAll}
-        >
-          <View style={[styles.checkbox, selectedIds.size === filteredStudents.length && selectedIds.size > 0 && { backgroundColor: colors.secondary }]}>
-            {selectedIds.size === filteredStudents.length && selectedIds.size > 0 && (
-              <ThemedText style={styles.checkmark}>✓</ThemedText>
-            )}
+        {students.length === 0 ? (
+          <View style={styles.emptyState}>
+            <ThemedText style={styles.emptyIcon}>👨‍🎓</ThemedText>
+            <ThemedText style={styles.emptyTitle}>No Students</ThemedText>
+            <ThemedText style={styles.emptyText}>
+              No students in your department yet
+            </ThemedText>
           </View>
-          <ThemedText style={styles.selectAllText}>Select All ({filteredStudents.length})</ThemedText>
-        </Pressable>
-
-        {/* Students List */}
-        {filteredStudents.map((student) => (
-          <Pressable
-            key={student.id}
-            style={[styles.card, { 
-              backgroundColor: colors.card,
-              borderColor: colors.border,
-            }]}
-            onPress={() => toggleSelection(student.id)}
-          >
-            <View style={styles.cardHeader}>
-              <View style={[styles.checkbox, selectedIds.has(student.id) && { backgroundColor: colors.secondary }]}>
-                {selectedIds.has(student.id) && (
+        ) : (
+          <>
+            {/* Select All */}
+            <Pressable
+              style={[styles.selectAllRow, { backgroundColor: colors.backgroundSecondary }]}
+              onPress={selectAll}
+            >
+              <View style={[styles.checkbox, selectedIds.size === filteredStudents.length && selectedIds.size > 0 && { backgroundColor: colors.secondary }]}>
+                {selectedIds.size === filteredStudents.length && selectedIds.size > 0 && (
                   <ThemedText style={styles.checkmark}>✓</ThemedText>
                 )}
               </View>
-              <View style={styles.cardInfo}>
-                <ThemedText style={styles.cardTitle}>{student.name}</ThemedText>
-                <ThemedText style={styles.cardSubtitle}>{student.studentNumber}</ThemedText>
-              </View>
-              <View style={styles.badgeContainer}>
-                {student.hasAccessCard ? (
-                  <View style={[styles.badge, { 
-                    backgroundColor: student.isActive ? colors.success : colors.warning 
-                  }]}>
-                    <ThemedText style={styles.badgeText}>
-                      {student.isActive ? 'Active' : 'Pending'}
+              <ThemedText style={styles.selectAllText}>Select All ({filteredStudents.length})</ThemedText>
+            </Pressable>
+
+            {/* Students List */}
+            {filteredStudents.map((student) => (
+              <Pressable
+                key={student.uid}
+                style={[styles.card, { 
+                  backgroundColor: colors.card,
+                  borderColor: colors.border,
+                }]}
+                onPress={() => toggleSelection(student.uid)}
+              >
+                <View style={styles.cardHeader}>
+                  <View style={[styles.checkbox, selectedIds.has(student.uid) && { backgroundColor: colors.secondary }]}>
+                    {selectedIds.has(student.uid) && (
+                      <ThemedText style={styles.checkmark}>✓</ThemedText>
+                    )}
+                  </View>
+                  <View style={styles.cardInfo}>
+                    <ThemedText style={styles.cardTitle}>
+                      {student.firstName} {student.lastName}
                     </ThemedText>
+                    <ThemedText style={styles.cardSubtitle}>{student.cardNumber}</ThemedText>
                   </View>
-                ) : (
-                  <View style={[styles.badge, { backgroundColor: colors.textTertiary }]}>
-                    <ThemedText style={styles.badgeText}>No Card</ThemedText>
+                  <View style={styles.badgeContainer}>
+                    {!student.isApproved && (
+                      <View style={[styles.badge, { backgroundColor: colors.warning }]}>
+                        <ThemedText style={styles.badgeText}>Pending</ThemedText>
+                      </View>
+                    )}
+                    <View style={[styles.badge, { 
+                      backgroundColor: student.isActive ? colors.success : colors.danger 
+                    }]}>
+                      <ThemedText style={styles.badgeText}>
+                        {student.isActive ? 'Active' : 'Inactive'}
+                      </ThemedText>
+                    </View>
                   </View>
-                )}
-              </View>
-            </View>
-            <View style={styles.cardDetails}>
-              <ThemedText style={styles.detailText}>📧 {student.email}</ThemedText>
-              <ThemedText style={styles.detailText}>
-                {student.hasAccessCard ? '💳 Access card registered' : '⚠️ No access card registered'}
-              </ThemedText>
-            </View>
-          </Pressable>
-        ))}
+                </View>
+                <View style={styles.cardDetails}>
+                  <ThemedText style={styles.detailText}>📧 {student.email}</ThemedText>
+                  <ThemedText style={styles.detailText}>
+                    {student.nfcId ? `🔑 NFC: ${student.nfcId}` : '⚠️ No NFC card assigned'}
+                  </ThemedText>
+                </View>
+              </Pressable>
+            ))}
+          </>
+        )}
       </ScrollView>
     </ThemedView>
   );
@@ -199,6 +342,30 @@ export default function StaffStudentsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  centerContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 80,
+  },
+  emptyIcon: {
+    fontSize: 64,
+    marginBottom: 16,
+    opacity: 0.3,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  emptyText: {
+    fontSize: 14,
+    opacity: 0.7,
+    textAlign: 'center',
   },
   banner: {
     flexDirection: 'row',

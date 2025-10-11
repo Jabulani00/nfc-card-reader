@@ -11,7 +11,7 @@ export default function StaffLayout() {
   const colors = Colors[colorScheme ?? 'light'];
   const router = useRouter();
   const pathname = usePathname();
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
 
   const handleLogout = async () => {
     try {
@@ -25,10 +25,15 @@ export default function StaffLayout() {
     }
   };
 
-  const tabs = [
+  // Build tabs based on staff permissions
+  const baseTabs = [
     { name: 'my-card', label: 'My Card', icon: '💳', path: '/(staff)/my-card' },
-    { name: 'students', label: 'My Students', icon: '👨‍🎓', path: '/(staff)/students' },
   ];
+
+  // Only show students tab if staff has approval permissions
+  const tabs = user?.canApproveStudents 
+    ? [...baseTabs, { name: 'students', label: 'My Students', icon: '👨‍🎓', path: '/(staff)/students' }]
+    : baseTabs;
 
   return (
     <ThemedView style={styles.container}>

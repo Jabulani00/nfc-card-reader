@@ -2,34 +2,39 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
-
-interface PendingUser {
-  id: string;
-  name: string;
-  email: string;
-  cardNumber: string;
-  department: string;
-  type: 'student' | 'staff';
-  registeredDate: string;
-}
-
-// Mock data
-const mockPendingUsers: PendingUser[] = [
-  { id: '1', name: 'Alex Johnson', email: 'alex@university.edu', cardNumber: 'ST005', department: 'Computer Science', type: 'student', registeredDate: '2025-10-10' },
-  { id: '2', name: 'Maria Garcia', email: 'maria@university.edu', cardNumber: 'SF005', department: 'Engineering', type: 'staff', registeredDate: '2025-10-09' },
-  { id: '3', name: 'James Lee', email: 'james@university.edu', cardNumber: 'ST006', department: 'Business', type: 'student', registeredDate: '2025-10-08' },
-  { id: '4', name: 'Dr. Patricia Martinez', email: 'patricia@university.edu', cardNumber: 'SF006', department: 'Medicine', type: 'staff', registeredDate: '2025-10-07' },
-];
+import { User } from '@/models/User';
+import { UserService } from '@/services/userService';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
 export default function ApprovalsScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   
-  const [pendingUsers, setPendingUsers] = useState<PendingUser[]>(mockPendingUsers);
+  const [pendingUsers, setPendingUsers] = useState<User[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Fetch pending approvals
+  const fetchPendingUsers = async () => {
+    try {
+      setLoading(true);
+      const users = await UserService.getPendingApprovals();
+      setPendingUsers(users);
+    } catch (error) {
+      console.error('Error fetching pending approvals:', error);
+      Alert.alert('Error', 'Failed to load pending approvals');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPendingUsers();
+  }, []);
 
   const toggleSelection = (id: string) => {
     const newSelected = new Set(selectedIds);
@@ -45,75 +50,139 @@ export default function ApprovalsScreen() {
     if (selectedIds.size === filteredUsers.length) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(filteredUsers.map(u => u.id)));
+      setSelectedIds(new Set(filteredUsers.map(u => u.uid)));
     }
   };
 
-  const approveSelected = () => {
+  const approveSelected = async () => {
     if (selectedIds.size === 0) return;
     
     Alert.alert(
       'Approve Users',
-      `Approve ${selectedIds.size} user(s)? They will be able to access their cards.`,
+      `Approve ${selectedIds.size} user(s)? They will be able to access the system.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Approve',
-          onPress: () => {
-            setPendingUsers(pendingUsers.filter(u => !selectedIds.has(u.id)));
-            setSelectedIds(new Set());
-            Alert.alert('Success', `Approved ${selectedIds.size} user(s)`);
+          onPress: async () => {
+            try {
+              setRefreshing(true);
+              const selectedCount = selectedIds.size;
+              
+              // Approve all selected users
+              const promises = Array.from(selectedIds).map(uid => 
+                UserService.approveUser(uid)
+              );
+              
+              await Promise.all(promises);
+              
+              // Refresh list
+              await fetchPendingUsers();
+              setSelectedIds(new Set());
+              
+              Alert.alert('Success', `Approved ${selectedCount} user(s)`);
+            } catch (error) {
+              console.error('Error approving users:', error);
+              Alert.alert('Error', 'Failed to approve some users');
+            }
           }
         }
       ]
     );
   };
 
-  const rejectSelected = () => {
+  const rejectSelected = async () => {
     if (selectedIds.size === 0) return;
     
     Alert.alert(
       'Reject Users',
-      `Reject ${selectedIds.size} user(s)? They will need to register again.`,
+      `Reject ${selectedIds.size} user(s)? Their accounts will be deactivated.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Reject',
           style: 'destructive',
-          onPress: () => {
-            setPendingUsers(pendingUsers.filter(u => !selectedIds.has(u.id)));
-            setSelectedIds(new Set());
-            Alert.alert('Success', `Rejected ${selectedIds.size} user(s)`);
+          onPress: async () => {
+            try {
+              setRefreshing(true);
+              const selectedCount = selectedIds.size;
+              
+              // Deactivate all selected users
+              const promises = Array.from(selectedIds).map(uid => 
+                UserService.deactivateUser(uid)
+              );
+              
+              await Promise.all(promises);
+              
+              // Refresh list
+              await fetchPendingUsers();
+              setSelectedIds(new Set());
+              
+              Alert.alert('Success', `Rejected ${selectedCount} user(s)`);
+            } catch (error) {
+              console.error('Error rejecting users:', error);
+              Alert.alert('Error', 'Failed to reject some users');
+            }
           }
         }
       ]
     );
   };
 
-  const revokeAll = () => {
+  const revokeAll = async () => {
+    if (pendingUsers.length === 0) return;
+    
     Alert.alert(
-      'Revoke All Users',
-      'Are you sure you want to reject all pending registrations? This action cannot be undone.',
+      'Reject All Users',
+      'Are you sure you want to reject all pending registrations?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Revoke All',
+          text: 'Reject All',
           style: 'destructive',
-          onPress: () => {
-            setPendingUsers([]);
-            setSelectedIds(new Set());
-            Alert.alert('Success', 'All pending users have been rejected');
+          onPress: async () => {
+            try {
+              setRefreshing(true);
+              const count = pendingUsers.length;
+              
+              // Deactivate all pending users
+              const promises = pendingUsers.map(user => 
+                UserService.deactivateUser(user.uid)
+              );
+              
+              await Promise.all(promises);
+              
+              // Refresh list
+              await fetchPendingUsers();
+              setSelectedIds(new Set());
+              
+              Alert.alert('Success', `Rejected ${count} pending user(s)`);
+            } catch (error) {
+              console.error('Error rejecting all users:', error);
+              Alert.alert('Error', 'Failed to reject all users');
+            }
           }
         }
       ]
     );
   };
 
-  const filteredUsers = pendingUsers.filter(u => 
-    u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    u.cardNumber.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredUsers = pendingUsers.filter(u => {
+    const fullName = `${u.firstName} ${u.lastName}`.toLowerCase();
+    const search = searchQuery.toLowerCase();
+    return fullName.includes(search) ||
+           u.email.toLowerCase().includes(search) ||
+           u.cardNumber.toLowerCase().includes(search);
+  });
+
+  if (loading) {
+    return (
+      <ThemedView style={[styles.container, styles.centerContent]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <ThemedText style={{ marginTop: 16 }}>Loading pending approvals...</ThemedText>
+      </ThemedView>
+    );
+  }
 
   return (
     <ThemedView style={styles.container}>
@@ -135,30 +204,40 @@ export default function ApprovalsScreen() {
           <Pressable
             style={[styles.button, { backgroundColor: colors.secondary }]}
             onPress={approveSelected}
-            disabled={selectedIds.size === 0}
+            disabled={selectedIds.size === 0 || refreshing}
           >
-            <ThemedText style={[styles.buttonText, selectedIds.size === 0 && styles.buttonTextDisabled]}>
-              ✓ Approve ({selectedIds.size})
+            <ThemedText style={[styles.buttonText, (selectedIds.size === 0 || refreshing) && styles.buttonTextDisabled]}>
+              {refreshing ? '...' : `✓ Approve (${selectedIds.size})`}
             </ThemedText>
           </Pressable>
           
           <Pressable
             style={[styles.button, { backgroundColor: colors.warning }]}
             onPress={rejectSelected}
-            disabled={selectedIds.size === 0}
+            disabled={selectedIds.size === 0 || refreshing}
           >
-            <ThemedText style={[styles.buttonText, selectedIds.size === 0 && styles.buttonTextDisabled]}>
-              ✕ Reject ({selectedIds.size})
+            <ThemedText style={[styles.buttonText, (selectedIds.size === 0 || refreshing) && styles.buttonTextDisabled]}>
+              {refreshing ? '...' : `✕ Reject (${selectedIds.size})`}
             </ThemedText>
           </Pressable>
           
           <Pressable
             style={[styles.button, { backgroundColor: colors.danger }]}
             onPress={revokeAll}
-            disabled={pendingUsers.length === 0}
+            disabled={pendingUsers.length === 0 || refreshing}
           >
-            <ThemedText style={[styles.buttonText, pendingUsers.length === 0 && styles.buttonTextDisabled]}>
-              Revoke All
+            <ThemedText style={[styles.buttonText, (pendingUsers.length === 0 || refreshing) && styles.buttonTextDisabled]}>
+              Reject All
+            </ThemedText>
+          </Pressable>
+
+          <Pressable
+            style={[styles.button, { backgroundColor: colors.primary }]}
+            onPress={fetchPendingUsers}
+            disabled={refreshing}
+          >
+            <ThemedText style={[styles.buttonText, refreshing && styles.buttonTextDisabled]}>
+              🔄 Refresh
             </ThemedText>
           </Pressable>
         </View>
@@ -191,35 +270,39 @@ export default function ApprovalsScreen() {
             {/* Pending Users List */}
             {filteredUsers.map((user) => (
               <Pressable
-                key={user.id}
+                key={user.uid}
                 style={[styles.card, { 
                   backgroundColor: colors.card,
                   borderColor: colors.border,
                 }]}
-                onPress={() => toggleSelection(user.id)}
+                onPress={() => toggleSelection(user.uid)}
               >
                 <View style={styles.cardHeader}>
-                  <View style={[styles.checkbox, selectedIds.has(user.id) && { backgroundColor: colors.primary }]}>
-                    {selectedIds.has(user.id) && (
+                  <View style={[styles.checkbox, selectedIds.has(user.uid) && { backgroundColor: colors.primary }]}>
+                    {selectedIds.has(user.uid) && (
                       <ThemedText style={styles.checkmark}>✓</ThemedText>
                     )}
                   </View>
                   <View style={styles.cardInfo}>
-                    <ThemedText style={styles.cardTitle}>{user.name}</ThemedText>
+                    <ThemedText style={styles.cardTitle}>
+                      {user.firstName} {user.lastName}
+                    </ThemedText>
                     <ThemedText style={styles.cardSubtitle}>{user.cardNumber}</ThemedText>
                   </View>
                   <View style={[styles.badge, { 
-                    backgroundColor: user.type === 'student' ? colors.info : colors.warning 
+                    backgroundColor: user.role === 'student' ? colors.info : colors.warning 
                   }]}>
                     <ThemedText style={styles.badgeText}>
-                      {user.type === 'student' ? 'Student' : 'Staff'}
+                      {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
                     </ThemedText>
                   </View>
                 </View>
                 <View style={styles.cardDetails}>
                   <ThemedText style={styles.detailText}>📧 {user.email}</ThemedText>
                   <ThemedText style={styles.detailText}>🏢 {user.department}</ThemedText>
-                  <ThemedText style={styles.detailText}>📅 Registered: {user.registeredDate}</ThemedText>
+                  <ThemedText style={styles.detailText}>
+                    📅 Registered: {user.createdAt.toLocaleDateString()}
+                  </ThemedText>
                 </View>
               </Pressable>
             ))}
@@ -233,6 +316,10 @@ export default function ApprovalsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  centerContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   header: {
     padding: 16,

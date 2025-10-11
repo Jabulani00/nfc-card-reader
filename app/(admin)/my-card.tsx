@@ -1,24 +1,37 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { UserCardLoading } from '@/components/user-card-loading';
 import { Colors } from '@/constants/colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useUserCard } from '@/hooks/use-user-card';
 import { Image, ScrollView, StyleSheet, View } from 'react-native';
 
 export default function MyCardScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const isDark = colorScheme === 'dark';
+  const card = useUserCard();
+
+  if (!card.isReady) {
+    return <UserCardLoading color={colors.primary} />;
+  }
+
+  const { user } = card;
 
   return (
     <ThemedView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
         {/* Profile Section */}
         <View style={styles.profileSection}>
-          <View style={[styles.avatarContainer, { backgroundColor: colors.primary }]}>
-            <ThemedText style={styles.avatarText}>AD</ThemedText>
-          </View>
-          <ThemedText style={styles.profileName}>Admin User</ThemedText>
-          <ThemedText style={styles.profileEmail}>admin@university.edu</ThemedText>
+          {card.hasProfileImage() ? (
+            <Image source={{ uri: user!.imageUrl }} style={styles.avatarImage} />
+          ) : (
+            <View style={[styles.avatarContainer, { backgroundColor: colors.primary }]}>
+              <ThemedText style={styles.avatarText}>{card.getInitials('AD')}</ThemedText>
+            </View>
+          )}
+          <ThemedText style={styles.profileName}>{card.getFullName()}</ThemedText>
+          <ThemedText style={styles.profileEmail}>{user!.email}</ThemedText>
         </View>
 
         {/* NFC Card */}
@@ -26,31 +39,86 @@ export default function MyCardScreen() {
           backgroundColor: isDark ? colors.backgroundTertiary : colors.card,
         }]}>
           <View style={[styles.card, { 
-            backgroundColor: colors.primary,
+            backgroundColor: '#FFFFFF',
             shadowColor: colors.shadow,
+            borderColor: colors.border,
           }]}>
-            {/* Card Header */}
+            {/* Card Header - Role Title */}
             <View style={styles.cardHeader}>
-              <Image
-                source={require('@/assets/images/icon.png')}
-                style={styles.cardLogo}
-              />
-              <ThemedText style={styles.cardTitle}>Tech University</ThemedText>
+              <ThemedText style={[styles.roleTitle, { color: colors.primary }]}>ADMINISTRATOR</ThemedText>
+              <View style={[styles.headerLine, { backgroundColor: colors.primary }]} />
             </View>
 
-            {/* Card Body */}
+            {/* Card Body - Landscape Access Card Layout */}
             <View style={styles.cardBody}>
-              <ThemedText style={styles.cardLabel}>Administrator</ThemedText>
-              <ThemedText style={styles.cardName}>Admin User</ThemedText>
-              <ThemedText style={styles.cardNumber}>ID: ADMIN001</ThemedText>
+              {/* Left Side - Decorative Elements */}
+              <View style={styles.leftSide}>
+                <View style={styles.decorativeElements}>
+                  <View style={[styles.diamond, styles.diamond1, { backgroundColor: colors.primary }]} />
+                  <View style={[styles.diamond, styles.diamond2, { backgroundColor: colors.secondary }]} />
+                  <View style={[styles.diamond, styles.diamond3, { backgroundColor: colors.warning }]} />
+                  <View style={[styles.diamond, styles.diamond4, { backgroundColor: colors.error }]} />
+                  <View style={[styles.zigzagLine, { backgroundColor: colors.text }]} />
+                  <View style={[styles.curvedLine, { backgroundColor: colors.error }]} />
+                </View>
+              </View>
+
+              {/* Center - User Info */}
+              <View style={styles.centerSection}>
+                <View style={styles.userInfoSection}>
+                  <ThemedText style={[styles.userName, { color: colors.primary }]}>
+                    {user!.firstName} {user!.lastName}
+                  </ThemedText>
+                  <ThemedText style={[styles.cardNumberText, { color: colors.text }]}>
+                    {user!.cardNumber}
+                  </ThemedText>
+                  <ThemedText style={[styles.accessDate, { color: colors.text }]}>
+                    Access: {card.formatDate(user!.createdAt)}
+                  </ThemedText>
+                  <ThemedText style={[styles.department, { color: colors.error }]}>
+                    {user!.department}
+                  </ThemedText>
+                </View>
+              </View>
+
+              {/* Right Side - Profile Photo */}
+              <View style={styles.rightSide}>
+                {card.hasProfileImage() ? (
+                  <Image source={{ uri: user!.imageUrl }} style={styles.profilePhoto} />
+                ) : (
+                  <View style={[styles.profilePlaceholder, { backgroundColor: colors.backgroundSecondary }]}>
+                    <ThemedText style={[styles.profileInitials, { color: colors.primary }]}>
+                      {card.getInitials('AD')}
+                    </ThemedText>
+                  </View>
+                )}
+              </View>
+
+              {/* Hidden NFC ID for reading */}
+              <View style={styles.hiddenNfc}>
+                <ThemedText style={styles.nfcId}>{user!.nfcId || user!.uid}</ThemedText>
+              </View>
             </View>
 
             {/* Card Footer */}
             <View style={styles.cardFooter}>
-              <View style={styles.nfcChip}>
-                <ThemedText style={styles.nfcIcon}>📱</ThemedText>
+              <View style={styles.footerLeft}>
+                <ThemedText style={[styles.universityShort, { color: colors.text }]}>TU</ThemedText>
+                <View style={styles.barcode}>
+                  <View style={[styles.bar, { backgroundColor: colors.text }]} />
+                  <View style={[styles.bar, styles.bar2, { backgroundColor: colors.text }]} />
+                  <View style={[styles.bar, styles.bar3, { backgroundColor: colors.text }]} />
+                  <View style={[styles.bar, { backgroundColor: colors.text }]} />
+                  <View style={[styles.bar, styles.bar5, { backgroundColor: colors.text }]} />
+                  <View style={[styles.bar, { backgroundColor: colors.text }]} />
+                  <View style={[styles.bar, styles.bar7, { backgroundColor: colors.text }]} />
+                  <View style={[styles.bar, { backgroundColor: colors.text }]} />
+                </View>
               </View>
-              <ThemedText style={styles.cardValid}>Valid Until: 2026</ThemedText>
+              <View style={styles.footerRight}>
+                <ThemedText style={[styles.universityName, { color: colors.text }]}>Tech University</ThemedText>
+                <ThemedText style={[styles.universityFull, { color: colors.text }]}>University of Technology</ThemedText>
+              </View>
             </View>
           </View>
         </View>
@@ -63,7 +131,7 @@ export default function MyCardScreen() {
           }]}>
             <ThemedText style={styles.infoIcon}>👨‍💼</ThemedText>
             <ThemedText style={styles.infoLabel}>Role</ThemedText>
-            <ThemedText style={styles.infoValue}>Administrator</ThemedText>
+            <ThemedText style={styles.infoValue}>{card.getRoleDisplayName('admin')}</ThemedText>
           </View>
 
           <View style={[styles.infoCard, { 
@@ -72,24 +140,26 @@ export default function MyCardScreen() {
           }]}>
             <ThemedText style={styles.infoIcon}>🏢</ThemedText>
             <ThemedText style={styles.infoLabel}>Department</ThemedText>
-            <ThemedText style={styles.infoValue}>IT Services</ThemedText>
+            <ThemedText style={styles.infoValue}>{user!.department}</ThemedText>
           </View>
         </View>
 
         {/* Access Status */}
         <View style={[styles.accessCard, { 
           backgroundColor: colors.card,
-          borderColor: colors.success,
+          borderColor: card.shouldShowSuccess() ? colors.success : colors.error,
         }]}>
           <View style={styles.accessHeader}>
-            <ThemedText style={styles.accessIcon}>✓</ThemedText>
+            <ThemedText style={styles.accessIcon}>{user!.isActive ? '✓' : '✕'}</ThemedText>
             <View style={styles.accessInfo}>
               <ThemedText style={styles.accessTitle}>Access Status</ThemedText>
-              <ThemedText style={styles.accessSubtitle}>All systems operational</ThemedText>
+              <ThemedText style={styles.accessSubtitle}>
+                {card.getAccessStatusText('admin')}
+              </ThemedText>
             </View>
           </View>
-          <View style={[styles.accessBadge, { backgroundColor: colors.success }]}>
-            <ThemedText style={styles.accessBadgeText}>ACTIVE</ThemedText>
+          <View style={[styles.accessBadge, { backgroundColor: user!.isActive ? colors.success : colors.error }]}>
+            <ThemedText style={styles.accessBadgeText}>{user!.isActive ? 'ACTIVE' : 'INACTIVE'}</ThemedText>
           </View>
         </View>
 
@@ -100,16 +170,32 @@ export default function MyCardScreen() {
         }]}>
           <ThemedText style={styles.detailsTitle}>Account Details</ThemedText>
           <View style={styles.detailRow}>
-            <ThemedText style={styles.detailLabel}>Last Login:</ThemedText>
-            <ThemedText style={styles.detailValue}>Oct 11, 2025 - 10:30 AM</ThemedText>
+            <ThemedText style={styles.detailLabel}>Card Number:</ThemedText>
+            <ThemedText style={styles.detailValue}>{user!.cardNumber}</ThemedText>
+          </View>
+          <View style={styles.detailRow}>
+            <ThemedText style={styles.detailLabel}>Email:</ThemedText>
+            <ThemedText style={styles.detailValue}>{user!.email}</ThemedText>
+          </View>
+          <View style={styles.detailRow}>
+            <ThemedText style={styles.detailLabel}>Department:</ThemedText>
+            <ThemedText style={styles.detailValue}>{user!.department}</ThemedText>
           </View>
           <View style={styles.detailRow}>
             <ThemedText style={styles.detailLabel}>Access Level:</ThemedText>
-            <ThemedText style={styles.detailValue}>Full Administrator</ThemedText>
+            <ThemedText style={styles.detailValue}>{card.getAccessLevel('admin')}</ThemedText>
+          </View>
+          <View style={styles.detailRow}>
+            <ThemedText style={styles.detailLabel}>Member Since:</ThemedText>
+            <ThemedText style={styles.detailValue}>{card.formatDate(user!.createdAt)}</ThemedText>
           </View>
           <View style={styles.detailRow}>
             <ThemedText style={styles.detailLabel}>Card Status:</ThemedText>
-            <ThemedText style={[styles.detailValue, { color: colors.success }]}>Active & Valid</ThemedText>
+            <ThemedText style={[styles.detailValue, { 
+              color: card.shouldShowSuccess() ? colors.success : card.shouldShowWarning() ? colors.warning : colors.error 
+            }]}>
+              {card.getCardStatus()}
+            </ThemedText>
           </View>
         </View>
       </ScrollView>
@@ -153,77 +239,212 @@ const styles = StyleSheet.create({
   },
   cardContainer: {
     padding: 16,
-    borderRadius: 16,
+    alignItems: 'center',
   },
   card: {
-    borderRadius: 16,
-    padding: 24,
-    minHeight: 200,
+    width: '100%',
+    maxWidth: 400,
+    aspectRatio: 1.6, // Landscape ratio - requires phone rotation
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
     shadowOffset: {
       width: 0,
-      height: 8,
+      height: 4,
     },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 10,
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
   },
   cardHeader: {
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    marginBottom: 24,
+    marginBottom: 12,
   },
-  cardLogo: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-  },
-  cardTitle: {
+  roleTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
+    fontWeight: 'bold',
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  headerLine: {
+    height: 2,
+    width: '100%',
   },
   cardBody: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  leftSide: {
+    width: 40,
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  centerSection: {
+    flex: 1,
+    paddingHorizontal: 16,
     justifyContent: 'center',
   },
-  cardLabel: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.7)',
-    marginBottom: 4,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+  rightSide: {
+    width: 80,
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  cardName: {
-    fontSize: 22,
+  userInfoSection: {
+    gap: 4,
+  },
+  userName: {
+    fontSize: 16,
     fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 8,
+    marginBottom: 6,
+    lineHeight: 18,
   },
-  cardNumber: {
+  cardNumberText: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
     fontFamily: 'monospace',
+    marginBottom: 4,
+    fontWeight: '500',
   },
-  cardFooter: {
+  accessDate: {
+    fontSize: 12,
+    marginBottom: 4,
+    opacity: 0.8,
+  },
+  department: {
+    fontSize: 11,
+    fontWeight: '500',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  photoSection: {
+    width: 80,
+    height: 100,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  profilePhoto: {
+    width: 70,
+    height: 90,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#000000',
+  },
+  profilePlaceholder: {
+    width: 70,
+    height: 90,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#000000',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  profileInitials: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  bottomSection: {
+    position: 'absolute',
+    bottom: 8,
+    left: 8,
+    right: 8,
     flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  decorativeElements: {
+    height: '100%',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  nfcChip: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
+  diamond: {
+    width: 8,
+    height: 8,
+    transform: [{ rotate: '45deg' }],
+  },
+  diamond1: {
+    marginBottom: 4,
+  },
+  diamond2: {
+    marginBottom: 4,
+  },
+  diamond3: {
+    marginBottom: 4,
+  },
+  diamond4: {
+    marginBottom: 8,
+  },
+  zigzagLine: {
+    width: 2,
+    height: 20,
+    marginBottom: 8,
+  },
+  curvedLine: {
+    width: 15,
+    height: 15,
+    borderRadius: 15,
+    borderWidth: 2,
+    backgroundColor: 'transparent',
+  },
+  hiddenNfc: {
+    position: 'absolute',
+    opacity: 0,
+    pointerEvents: 'none',
+    width: 0,
+    height: 0,
+    overflow: 'hidden',
+  },
+  nfcId: {
+    fontSize: 1,
+  },
+  cardFooter: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 8,
   },
-  nfcIcon: {
-    fontSize: 20,
+  footerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
-  cardValid: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.8)',
+  universityShort: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  barcode: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  bar: {
+    width: 2,
+    height: 20,
+  },
+  bar2: {
+    height: 25,
+  },
+  bar3: {
+    height: 15,
+  },
+  bar5: {
+    height: 30,
+  },
+  bar7: {
+    height: 18,
+  },
+  footerRight: {
+    alignItems: 'flex-end',
+  },
+  universityName: {
+    fontSize: 10,
+    fontWeight: '500',
+  },
+  universityFull: {
+    fontSize: 8,
+    marginTop: 2,
   },
   infoSection: {
     flexDirection: 'row',
@@ -314,6 +535,12 @@ const styles = StyleSheet.create({
   detailValue: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  avatarImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    marginBottom: 16,
   },
 });
 

@@ -14,9 +14,16 @@ export default function LandingScreen() {
   const colors = Colors[colorScheme ?? 'light'];
   const { user, loading } = useAuth();
 
-  // Redirect already logged-in users to their dashboard
+  // Redirect already logged-in users based on their status
   useEffect(() => {
     if (!loading && user) {
+      // Check if user is approved and active
+      if (!user.isApproved || !user.isActive) {
+        router.replace('/pending-approval');
+        return;
+      }
+
+      // Redirect to appropriate dashboard
       if (user.role === 'admin') {
         router.replace('/(admin)/students');
       } else if (user.role === 'staff') {

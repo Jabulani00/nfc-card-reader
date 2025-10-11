@@ -19,9 +19,16 @@ export default function LoginScreen() {
   const [cardNumber, setCardNumber] = useState('');
   const [password, setPassword] = useState('');
 
-  // Navigate based on user role when user logs in
+  // Navigate based on user role and approval status
   useEffect(() => {
     if (user) {
+      // Check if user needs approval
+      if (!user.isApproved || !user.isActive) {
+        router.replace('/pending-approval');
+        return;
+      }
+
+      // Redirect to appropriate dashboard
       if (user.role === 'admin') {
         router.replace('/(admin)/students');
       } else if (user.role === 'staff') {

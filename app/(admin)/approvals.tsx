@@ -20,17 +20,21 @@ export default function ApprovalsScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   // Fetch pending approvals
-  const fetchPendingUsers = async () => {
+  const fetchPendingUsers = async (showToast = false) => {
     try {
-      setLoading(true);
+      if (!showToast) {
+        setLoading(true);
+      }
       const users = await AdminService.getPendingApprovals();
       setPendingUsers(users);
-      if (!loading) {
+      if (showToast) {
         toast.success('Pending approvals refreshed');
       }
     } catch (error) {
       console.error('Error fetching pending approvals:', error);
-      toast.error('Failed to load pending approvals');
+      if (showToast) {
+        toast.error('Failed to load pending approvals');
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -75,7 +79,7 @@ export default function ApprovalsScreen() {
       const result = await AdminService.approveBulk(Array.from(selectedIds));
       
       // Refresh list
-      await fetchPendingUsers();
+      await fetchPendingUsers(false);
       setSelectedIds(new Set());
       
       if (result.failed > 0) {
@@ -107,7 +111,7 @@ export default function ApprovalsScreen() {
       const result = await AdminService.rejectBulk(Array.from(selectedIds));
       
       // Refresh list
-      await fetchPendingUsers();
+      await fetchPendingUsers(false);
       setSelectedIds(new Set());
       
       if (result.failed > 0) {
@@ -150,7 +154,7 @@ export default function ApprovalsScreen() {
               );
               
               // Refresh list
-              await fetchPendingUsers();
+              await fetchPendingUsers(false);
               setSelectedIds(new Set());
               
               if (result.failed > 0) {

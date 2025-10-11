@@ -22,23 +22,29 @@ export default function StaffStudentsScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   // Fetch students from staff's department
-  const fetchDepartmentStudents = async () => {
+  const fetchDepartmentStudents = async (showToast = false) => {
     try {
-      setLoading(true);
+      if (!showToast) {
+        setLoading(true);
+      }
       if (!user) {
-        toast.error('User session expired');
+        if (showToast) {
+          toast.error('User session expired');
+        }
         return;
       }
       
       // Use StaffService to get department students
       const departmentStudents = await StaffService.getDepartmentStudents(user);
       setStudents(departmentStudents);
-      if (!loading) {
+      if (showToast) {
         toast.success('Department students refreshed');
       }
     } catch (error) {
       console.error('Error fetching students:', error);
-      toast.error('Failed to load students');
+      if (showToast) {
+        toast.error('Failed to load students');
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -93,7 +99,7 @@ export default function StaffStudentsScreen() {
       );
       
       // Refresh list
-      await fetchDepartmentStudents();
+      await fetchDepartmentStudents(false);
       setSelectedIds(new Set());
       
       if (result.failed > 0) {
@@ -133,7 +139,7 @@ export default function StaffStudentsScreen() {
       );
       
       // Refresh list
-      await fetchDepartmentStudents();
+      await fetchDepartmentStudents(false);
       setSelectedIds(new Set());
       
       if (result.failed > 0) {
@@ -173,7 +179,7 @@ export default function StaffStudentsScreen() {
       );
       
       // Refresh list
-      await fetchDepartmentStudents();
+      await fetchDepartmentStudents(false);
       setSelectedIds(new Set());
       
       if (result.failed > 0) {

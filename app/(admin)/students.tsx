@@ -23,17 +23,21 @@ export default function StudentsScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   // Fetch students
-  const fetchStudents = async () => {
+  const fetchStudents = async (showToast = false) => {
     try {
-      setLoading(true);
+      if (!showToast) {
+        setLoading(true);
+      }
       const users = await UserService.getUsersByRole('student');
       setStudents(users);
-      if (!loading) {
+      if (showToast) {
         toast.success('Students list refreshed');
       }
     } catch (error) {
       console.error('Error fetching students:', error);
-      toast.error('Failed to load students');
+      if (showToast) {
+        toast.error('Failed to load students');
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -77,7 +81,7 @@ export default function StudentsScreen() {
       const result = await AdminService.grantAccessBulk(Array.from(selectedIds));
       
       // Refresh list
-      await fetchStudents();
+      await fetchStudents(false);
       setSelectedIds(new Set());
       
       if (result.failed > 0) {
@@ -108,7 +112,7 @@ export default function StudentsScreen() {
       const result = await AdminService.revokeAccessBulk(Array.from(selectedIds));
       
       // Refresh list
-      await fetchStudents();
+      await fetchStudents(false);
       setSelectedIds(new Set());
       
       if (result.failed > 0) {

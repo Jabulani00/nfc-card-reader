@@ -23,17 +23,21 @@ export default function StaffScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   // Fetch staff
-  const fetchStaff = async () => {
+  const fetchStaff = async (showToast = false) => {
     try {
-      setLoading(true);
+      if (!showToast) {
+        setLoading(true);
+      }
       const users = await UserService.getUsersByRole('staff');
       setStaff(users);
-      if (!loading) {
+      if (showToast) {
         toast.success('Staff list refreshed');
       }
     } catch (error) {
       console.error('Error fetching staff:', error);
-      toast.error('Failed to load staff');
+      if (showToast) {
+        toast.error('Failed to load staff');
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -77,7 +81,7 @@ export default function StaffScreen() {
       const result = await AdminService.grantAccessBulk(Array.from(selectedIds));
       
       // Refresh list
-      await fetchStaff();
+      await fetchStaff(false);
       setSelectedIds(new Set());
       
       if (result.failed > 0) {
@@ -108,7 +112,7 @@ export default function StaffScreen() {
       const result = await AdminService.revokeAccessBulk(Array.from(selectedIds));
       
       // Refresh list
-      await fetchStaff();
+      await fetchStaff(false);
       setSelectedIds(new Set());
       
       if (result.failed > 0) {
@@ -137,7 +141,7 @@ export default function StaffScreen() {
         toast.success('Approval rights revoked successfully!');
       }
       
-      await fetchStaff();
+      await fetchStaff(false);
     } catch (error: any) {
       console.error('Error updating permissions:', error);
       toast.error(error.message || 'Failed to update permissions');

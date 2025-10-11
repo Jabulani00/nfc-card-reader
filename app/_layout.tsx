@@ -49,10 +49,17 @@ export default function RootLayout() {
               }} 
             />
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="(admin)" options={{ headerShown: false }} />
-            <Stack.Screen name="(staff)" options={{ headerShown: false }} />
-            <Stack.Screen name="(student)" options={{ headerShown: false }} />
-          </Stack>
+          <Stack.Screen name="(admin)" options={{ headerShown: false }} />
+          <Stack.Screen name="(staff)" options={{ headerShown: false }} />
+          <Stack.Screen name="(student)" options={{ headerShown: false }} />
+          <Stack.Screen 
+            name="pending-approval" 
+            options={{ 
+              title: 'Pending Approval', 
+              headerShown: false
+            }} 
+          />
+        </Stack>
           <StatusBar style="auto" />
         </ThemeProvider>
       </AuthProvider>

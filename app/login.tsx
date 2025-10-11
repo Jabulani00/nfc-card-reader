@@ -14,7 +14,7 @@ export default function LoginScreen() {
   const colors = Colors[colorScheme ?? 'light'];
   const { user, login, loading } = useAuth();
   
-  const [email, setEmail] = useState('');
+  const [cardNumber, setCardNumber] = useState('');
   const [password, setPassword] = useState('');
 
   // Navigate based on user role when user logs in
@@ -31,13 +31,13 @@ export default function LoginScreen() {
   }, [user]);
 
   const handleLogin = async () => {
-    if (!email || !password) {
+    if (!cardNumber || !password) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
 
     try {
-      await login({ email, password });
+      await login({ cardNumber, password });
     } catch (error: any) {
       Alert.alert('Login Failed', error.message || 'Invalid credentials');
     }
@@ -54,9 +54,9 @@ export default function LoginScreen() {
             <ThemedText style={styles.title}>Welcome Back</ThemedText>
             <ThemedText style={styles.subtitle}>Sign in to continue</ThemedText>
 
-            {/* Email Input */}
+            {/* Card Number Input */}
             <View style={styles.inputContainer}>
-              <ThemedText style={styles.label}>Email</ThemedText>
+              <ThemedText style={styles.label}>Card Number</ThemedText>
               <TextInput
                 style={[
                   styles.input,
@@ -65,12 +65,11 @@ export default function LoginScreen() {
                     color: colors.text,
                   }
                 ]}
-                placeholder="Enter your email"
+                placeholder="Enter your card number"
                 placeholderTextColor={colors.textTertiary}
-                value={email}
-                onChangeText={setEmail}
+                value={cardNumber}
+                onChangeText={setCardNumber}
                 autoCapitalize="none"
-                keyboardType="email-address"
                 editable={!loading}
               />
             </View>

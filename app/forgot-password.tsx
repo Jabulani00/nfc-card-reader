@@ -12,19 +12,19 @@ export default function ForgotPasswordScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const colors = Colors[colorScheme ?? 'light'];
-  const { resetPassword, loading } = useAuth();
+  const { resetPasswordByCardNumber, loading } = useAuth();
   
-  const [email, setEmail] = useState('');
+  const [cardNumber, setCardNumber] = useState('');
   const [isSubmitted, setIsSubmitted] = useState(false);
 
   const handleResetPassword = async () => {
-    if (!email) {
-      Alert.alert('Error', 'Please enter your email address');
+    if (!cardNumber) {
+      Alert.alert('Error', 'Please enter your card number');
       return;
     }
 
     try {
-      await resetPassword(email);
+      await resetPasswordByCardNumber(cardNumber);
       setIsSubmitted(true);
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to send reset email');
@@ -43,12 +43,12 @@ export default function ForgotPasswordScreen() {
               <>
                 <ThemedText style={styles.title}>Forgot Password?</ThemedText>
                 <ThemedText style={styles.subtitle}>
-                  Enter your email address and we'll send you instructions to reset your password.
+                  Enter your card number and we'll send you instructions to reset your password.
                 </ThemedText>
 
-                {/* Email Input */}
+                {/* Card Number Input */}
                 <View style={styles.inputContainer}>
-                  <ThemedText style={styles.label}>Email</ThemedText>
+                  <ThemedText style={styles.label}>Card Number</ThemedText>
                   <TextInput
                     style={[
                       styles.input,
@@ -57,11 +57,10 @@ export default function ForgotPasswordScreen() {
                         color: colors.text,
                       }
                     ]}
-                    placeholder="Enter your email"
+                    placeholder="Enter your card number"
                     placeholderTextColor={colors.textTertiary}
-                    value={email}
-                    onChangeText={setEmail}
-                    keyboardType="email-address"
+                    value={cardNumber}
+                    onChangeText={setCardNumber}
                     autoCapitalize="none"
                     editable={!loading}
                   />
@@ -97,8 +96,7 @@ export default function ForgotPasswordScreen() {
                   <ThemedText style={[styles.successIcon, { color: colors.success }]}>✓</ThemedText>
                   <ThemedText style={styles.successTitle}>Check Your Email</ThemedText>
                   <ThemedText style={styles.successMessage}>
-                    We've sent password reset instructions to{'\n'}
-                    <ThemedText style={styles.emailText}>{email}</ThemedText>
+                    We've sent password reset instructions to the email address associated with your card number.
                   </ThemedText>
                 </View>
 

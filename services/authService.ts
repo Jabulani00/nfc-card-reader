@@ -34,18 +34,38 @@ export class AuthService {
   }
 
   /**
-   * Sign in with email and password
+   * Sign in with card number and password
    */
   static async login(credentials: LoginCredentials): Promise<FirebaseUser> {
     try {
+      // First, look up the user by card number to get their email
+      const { UserService } = require('./userService');
+      const user = await UserService.getUserByCardNumber(credentials.cardNumber);
+      
+      if (!user) {
+        throw new Error('Invalid card number or password');
+      }
+
+      // Use the email to sign in with Firebase Auth
       const userCredential = await signInWithEmailAndPassword(
         auth,
-        credentials.email,
+        user.email,
         credentials.password
       );
       return userCredential.user;
     } catch (error: any) {
       console.error('Login error:', error);
+      
+      // If it's our custom "Invalid card number" error, throw it as-is
+      if (error.message === 'Invalid card number or password') {
+        throw error;
+      }
+      
+      // For Firebase auth errors, use generic message to avoid revealing valid card numbers
+      if (error.code && error.code.startsWith('auth/')) {
+        throw new Error('Invalid card number or password');
+      }
+      
       throw this.handleAuthError(error);
     }
   }
@@ -70,6 +90,33 @@ export class AuthService {
       await sendPasswordResetEmail(auth, email);
     } catch (error: any) {
       console.error('Password reset error:', error);
+      throw this.handleAuthError(error);
+    }
+  }
+
+  /**
+   * Send password reset email using card number
+   */
+  static async resetPasswordByCardNumber(cardNumber: string): Promise<void> {
+    try {
+      // Look up the user by card number to get their email
+      const { UserService } = require('./userService');
+      const user = await UserService.getUserByCardNumber(cardNumber);
+      
+      if (!user) {
+        throw new Error('No account found with this card number');
+      }
+
+      // Send password reset email
+      await sendPasswordResetEmail(auth, user.email);
+    } catch (error: any) {
+      console.error('Password reset error:', error);
+      
+      // If it's our custom error, throw it as-is
+      if (error.message === 'No account found with this card number') {
+        throw error;
+      }
+      
       throw this.handleAuthError(error);
     }
   }

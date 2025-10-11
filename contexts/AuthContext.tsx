@@ -14,6 +14,7 @@ interface AuthContextType {
   register: (userData: CreateUserData) => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  resetPasswordByCardNumber: (cardNumber: string) => Promise<void>;
   clearError: () => void;
 }
 
@@ -163,6 +164,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const resetPasswordByCardNumber = async (cardNumber: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      await AuthService.resetPasswordByCardNumber(cardNumber);
+    } catch (err: any) {
+      console.error('Password reset error:', err);
+      setError(err.message || 'Failed to send reset email');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const clearError = () => {
     setError(null);
   };
@@ -176,6 +192,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     register,
     logout,
     resetPassword,
+    resetPasswordByCardNumber,
     clearError,
   };
 

@@ -29,7 +29,7 @@ export interface CreateUserData {
 }
 
 export interface LoginCredentials {
-  email: string;
+  cardNumber: string;
   password: string;
 }
 

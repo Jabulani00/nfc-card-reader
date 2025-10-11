@@ -13,27 +13,17 @@ export default function AdminLayout() {
   const pathname = usePathname();
   const { logout } = useAuth();
 
-  const handleLogout = () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await logout();
-              router.replace('/');
-            } catch (error) {
-              console.error('Logout error:', error);
-              Alert.alert('Error', 'Failed to logout');
-            }
-          }
-        }
-      ]
-    );
+  const handleLogout = async () => {
+    try {
+      console.log('Logging out...');
+      await logout();
+      console.log('Logout successful, navigating to home...');
+      // Use push instead of replace to ensure navigation works
+      router.push('/');
+    } catch (error) {
+      console.error('Logout error:', error);
+      Alert.alert('Error', 'Failed to logout. Please try again.');
+    }
   };
 
   const tabs = [
@@ -64,18 +54,18 @@ export default function AdminLayout() {
             </View>
           </View>
 
-          {/* Logout Icon */}
+          {/* Logout Button */}
           <Pressable
             style={({ pressed }) => [
               styles.logoutButton,
               { 
                 backgroundColor: colors.danger,
-                opacity: pressed ? 0.8 : 1,
+                opacity: pressed ? 0.7 : 1,
               }
             ]}
             onPress={handleLogout}
           >
-            <ThemedText style={styles.logoutIcon}>⎋</ThemedText>
+            <ThemedText style={styles.logoutText}>Logout</ThemedText>
           </Pressable>
         </View>
 
@@ -175,16 +165,16 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   logoutButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  logoutIcon: {
+  logoutText: {
     color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 14,
+    fontWeight: '600',
   },
   tabContainer: {
     flexDirection: 'row',

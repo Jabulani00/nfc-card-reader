@@ -1,15 +1,41 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/colors';
+import { useAuth } from '@/contexts/AuthContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useRouter } from 'expo-router';
-import { Image, Pressable, StyleSheet, View } from 'react-native';
+import { useEffect } from 'react';
+import { ActivityIndicator, Image, Pressable, StyleSheet, View } from 'react-native';
 
 export default function LandingScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const colors = Colors[colorScheme ?? 'light'];
+  const { user, loading } = useAuth();
+
+  // Redirect already logged-in users to their dashboard
+  useEffect(() => {
+    if (!loading && user) {
+      if (user.role === 'admin') {
+        router.replace('/(admin)/students');
+      } else if (user.role === 'staff') {
+        router.replace('/(staff)/my-card');
+      } else if (user.role === 'student') {
+        router.replace('/(student)/my-card');
+      }
+    }
+  }, [user, loading]);
+
+  // Show loading spinner while checking auth state
+  if (loading) {
+    return (
+      <ThemedView style={[styles.container, styles.centerContent]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <ThemedText style={{ marginTop: 16 }}>Loading...</ThemedText>
+      </ThemedView>
+    );
+  }
 
   return (
     <ThemedView style={styles.container}>
@@ -76,6 +102,10 @@ export default function LandingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  centerContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   gradientOverlay: {
     position: 'absolute',

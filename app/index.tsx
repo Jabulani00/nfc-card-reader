@@ -37,9 +37,29 @@ export default function LandingScreen() {
   // Show loading spinner while checking auth state
   if (loading) {
     return (
-      <ThemedView style={[styles.container, styles.centerContent]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <ThemedText style={{ marginTop: 16 }}>Loading...</ThemedText>
+      <ThemedView style={styles.container}>
+        {/* Background Gradient Overlay */}
+        <View style={styles.gradientOverlay}>
+          <View style={[styles.circle, styles.circle1, { backgroundColor: '#00C8FC', opacity: isDark ? 0.08 : 0.12 }]} />
+          <View style={[styles.circle, styles.circle2, { backgroundColor: '#00C8FC', opacity: isDark ? 0.08 : 0.12 }]} />
+        </View>
+
+        <View style={[styles.content, styles.centerContent]}>
+          {/* Logo */}
+          <View style={styles.logoWrapper}>
+            {isDark && (
+              <View style={styles.logoBackground} />
+            )}
+            <Image
+              source={require('@/assets/images/icon.png')}
+              style={styles.logo}
+            />
+          </View>
+
+          {/* Loading Indicator */}
+          <ActivityIndicator size="large" color="#00C8FC" style={styles.loadingSpinner} />
+          <ThemedText style={styles.loadingText}>Loading...</ThemedText>
+        </View>
       </ThemedView>
     );
   }
@@ -48,58 +68,66 @@ export default function LandingScreen() {
     <ThemedView style={styles.container}>
       {/* Background Gradient Overlay */}
       <View style={styles.gradientOverlay}>
-        <View style={[styles.circle, styles.circle1, { backgroundColor: colors.primary, opacity: isDark ? 0.1 : 0.15 }]} />
-        <View style={[styles.circle, styles.circle2, { backgroundColor: colors.primary, opacity: isDark ? 0.1 : 0.15 }]} />
+        <View style={[styles.circle, styles.circle1, { backgroundColor: '#00C8FC', opacity: isDark ? 0.08 : 0.12 }]} />
+        <View style={[styles.circle, styles.circle2, { backgroundColor: '#00C8FC', opacity: isDark ? 0.08 : 0.12 }]} />
       </View>
 
       <View style={styles.content}>
-        {/* Logo Container with Shadow */}
+        {/* Logo - with background for dark mode visibility */}
         <View style={styles.logoWrapper}>
-          <View style={[styles.logoShadow, { backgroundColor: `${colors.primary}30` }]} />
-          <View style={[styles.logoContainer, { backgroundColor: colors.card }]}>
-            <Image
-              source={require('@/assets/images/icon.png')}
-              style={styles.logo}
-            />
-          </View>
+          {isDark && (
+            <View style={styles.logoBackground} />
+          )}
+          <Image
+            source={require('@/assets/images/icon.png')}
+            style={styles.logo}
+          />
         </View>
 
-        {/* University Name */}
-        <ThemedText style={styles.universityName}>
-          Tech University
-        </ThemedText>
-
-        {/* Slogan */}
-        <View style={styles.sloganContainer}>
-          <View style={[styles.sloganLine, { backgroundColor: colors.primary }]} />
-          <ThemedText style={styles.slogan}>
-            Excellence in Education & Innovation
+        {/* Secure Access Badge */}
+        <View style={[styles.securityBadge, { borderColor: `${isDark ? '#00C8FC' : '#00C8FC'}40` }]}>
+          <View style={styles.securityDot} />
+          <ThemedText style={[styles.securityText, { color: colors.textSecondary }]}>
+            Secure Authentication
           </ThemedText>
-          <View style={[styles.sloganLine, { backgroundColor: colors.primary }]} />
         </View>
 
-        {/* NFC Badge */}
-        <View style={[styles.nfcBadge, { backgroundColor: `${colors.primary}15` }]}>
-          <ThemedText style={styles.nfcIcon}>📱</ThemedText>
-          <ThemedText style={[styles.nfcText, { color: colors.primary }]}>NFC Card Reader System</ThemedText>
-        </View>
+        {/* Action Buttons Container */}
+        <View style={styles.buttonsContainer}>
+          {/* Sign In Button */}
+          <Pressable
+            style={({ pressed }) => [
+              styles.signInButton,
+              { 
+                backgroundColor: '#00C8FC',
+                shadowColor: '#00C8FC',
+              },
+              pressed && styles.buttonPressed,
+            ]}
+            onPress={() => router.push('/login')}
+          >
+            <ThemedText style={styles.buttonText}>Sign In</ThemedText>
+            <View style={styles.buttonIcon}>
+              <ThemedText style={styles.buttonIconText}>→</ThemedText>
+            </View>
+          </Pressable>
 
-        {/* Sign In Button */}
-        <Pressable
-          style={({ pressed }) => [
-            styles.signInButton,
-            { backgroundColor: colors.primary, shadowColor: colors.primary },
-            pressed && styles.signInButtonPressed,
-          ]}
-          onPress={() => router.push('/login')}
-        >
-          <ThemedText style={styles.signInButtonText}>Sign In</ThemedText>
-          <ThemedText style={styles.signInButtonIcon}>→</ThemedText>
-        </Pressable>
+          {/* Sign Up Link Button */}
+          <Pressable
+            style={({ pressed }) => [
+              styles.signUpButton,
+              { borderColor: '#00C8FC' },
+              pressed && styles.buttonPressed,
+            ]}
+            onPress={() => router.push('/signup')}
+          >
+            <ThemedText style={[styles.signUpText, { color: '#00C8FC' }]}>Create Account</ThemedText>
+          </Pressable>
+        </View>
 
         {/* Footer Text */}
         <ThemedText style={styles.footerText}>
-          Secure Access for Students & Staff
+          NFC-enabled access for students & staff
         </ThemedText>
       </View>
     </ThemedView>
@@ -114,6 +142,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  loadingSpinner: {
+    marginTop: 32,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 14,
+    opacity: 0.6,
+    letterSpacing: 0.3,
+  },
   gradientOverlay: {
     position: 'absolute',
     width: '100%',
@@ -125,16 +162,16 @@ const styles = StyleSheet.create({
     borderRadius: 1000,
   },
   circle1: {
-    width: 300,
-    height: 300,
-    top: -100,
-    right: -100,
+    width: 400,
+    height: 400,
+    top: -150,
+    right: -150,
   },
   circle2: {
-    width: 250,
-    height: 250,
-    bottom: -80,
-    left: -80,
+    width: 350,
+    height: 350,
+    bottom: -120,
+    left: -120,
   },
   content: {
     flex: 1,
@@ -144,79 +181,62 @@ const styles = StyleSheet.create({
     paddingVertical: 60,
   },
   logoWrapper: {
+    marginBottom: 48,
     position: 'relative',
-    marginBottom: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  logoShadow: {
+  logoBackground: {
     position: 'absolute',
-    width: 170,
-    height: 170,
-    borderRadius: 85,
-    top: 10,
-    left: -10,
-  },
-  logoContainer: {
-    borderRadius: 85,
-    padding: 10,
-    shadowColor: '#000',
+    width: 190,
+    height: 190,
+    borderRadius: 95,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#00C8FC',
     shadowOffset: {
       width: 0,
-      height: 8,
+      height: 4,
     },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.15,
     shadowRadius: 12,
-    elevation: 10,
+    elevation: 8,
   },
   logo: {
-    width: 150,
-    height: 150,
+    width: 180,
+    height: 180,
     resizeMode: 'contain',
+    zIndex: 1,
   },
-  universityName: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'center',
-    letterSpacing: 1,
-  },
-  sloganContainer: {
+  securityBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 40,
-    gap: 12,
-  },
-  sloganLine: {
-    width: 30,
-    height: 2,
-    opacity: 0.5,
-  },
-  slogan: {
-    fontSize: 14,
-    opacity: 0.7,
-    textAlign: 'center',
-    fontStyle: 'italic',
-  },
-  nfcBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 24,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    borderWidth: 1,
     marginBottom: 48,
     gap: 8,
   },
-  nfcIcon: {
-    fontSize: 24,
+  securityDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#00C8FC',
   },
-  nfcText: {
-    fontSize: 14,
-    fontWeight: '600',
+  securityText: {
+    fontSize: 13,
+    fontWeight: '500',
+    letterSpacing: 0.3,
+  },
+  buttonsContainer: {
+    width: '100%',
+    maxWidth: 320,
+    gap: 12,
   },
   signInButton: {
-    paddingVertical: 18,
-    paddingHorizontal: 64,
-    borderRadius: 30,
-    minWidth: 240,
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    borderRadius: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -225,30 +245,50 @@ const styles = StyleSheet.create({
       width: 0,
       height: 4,
     },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.25,
     shadowRadius: 8,
-    elevation: 8,
+    elevation: 5,
   },
-  signInButtonPressed: {
-    opacity: 0.8,
+  buttonPressed: {
+    opacity: 0.85,
     transform: [{ scale: 0.98 }],
   },
-  signInButtonText: {
+  buttonText: {
     color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+    fontSize: 16,
+    fontWeight: '600',
+    letterSpacing: 0.3,
   },
-  signInButtonIcon: {
+  buttonIcon: {
+    width: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  buttonIconText: {
     color: '#FFFFFF',
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  signUpButton: {
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  signUpText: {
+    fontSize: 16,
+    fontWeight: '600',
+    letterSpacing: 0.3,
   },
   footerText: {
-    fontSize: 12,
-    opacity: 0.5,
-    marginTop: 24,
+    fontSize: 11,
+    opacity: 0.45,
+    marginTop: 32,
     textAlign: 'center',
+    letterSpacing: 0.5,
   },
 });
 

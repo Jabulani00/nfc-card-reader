@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -56,12 +56,29 @@ export default function LoginScreen() {
 
   return (
     <ThemedView style={styles.container}>
+      {/* Background Gradient Overlay */}
+      <View style={styles.gradientOverlay}>
+        <View style={[styles.circle, styles.circle1, { backgroundColor: '#00C8FC', opacity: isDark ? 0.08 : 0.12 }]} />
+        <View style={[styles.circle, styles.circle2, { backgroundColor: '#00C8FC', opacity: isDark ? 0.08 : 0.12 }]} />
+      </View>
+
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.content}>
+            {/* Logo */}
+            <View style={styles.logoWrapper}>
+              {isDark && (
+                <View style={styles.logoBackground} />
+              )}
+              <Image
+                source={require('@/assets/images/icon.png')}
+                style={styles.logo}
+              />
+            </View>
+
             <ThemedText style={styles.title}>Welcome Back</ThemedText>
             <ThemedText style={styles.subtitle}>Sign in to continue</ThemedText>
 
@@ -110,7 +127,7 @@ export default function LoginScreen() {
               onPress={() => router.push('/forgot-password')}
               style={styles.forgotPasswordContainer}
             >
-              <ThemedText style={[styles.forgotPasswordText, { color: colors.primary }]}>
+              <ThemedText style={[styles.forgotPasswordText, { color: '#00C8FC' }]}>
                 Forgot Password?
               </ThemedText>
             </Pressable>
@@ -119,7 +136,10 @@ export default function LoginScreen() {
             <Pressable
               style={({ pressed }) => [
                 styles.loginButton,
-                { backgroundColor: colors.primary },
+                { 
+                  backgroundColor: '#00C8FC',
+                  shadowColor: '#00C8FC',
+                },
                 (pressed || loading) && styles.loginButtonPressed,
               ]}
               onPress={handleLogin}
@@ -128,7 +148,7 @@ export default function LoginScreen() {
               {loading ? (
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
-                <ThemedText style={styles.loginButtonText}>Login</ThemedText>
+                <ThemedText style={styles.loginButtonText}>Sign In</ThemedText>
               )}
             </Pressable>
 
@@ -136,13 +156,13 @@ export default function LoginScreen() {
             <View style={styles.signUpContainer}>
               <ThemedText style={styles.signUpText}>Don't have an account? </ThemedText>
               <Pressable onPress={() => router.push('/signup')}>
-                <ThemedText style={[styles.signUpLink, { color: colors.primary }]}>Sign Up</ThemedText>
+                <ThemedText style={[styles.signUpLink, { color: '#00C8FC' }]}>Create Account</ThemedText>
               </Pressable>
             </View>
 
             {/* Back to Home Link */}
             <Pressable onPress={() => router.push('/')} style={styles.backToHomeContainer}>
-              <ThemedText style={styles.backToHomeText}>← Back to Home</ThemedText>
+              <ThemedText style={[styles.backToHomeText, { color: colors.textTertiary }]}>← Back to Home</ThemedText>
             </Pressable>
           </View>
         </ScrollView>
@@ -155,6 +175,28 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  gradientOverlay: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    overflow: 'hidden',
+  },
+  circle: {
+    position: 'absolute',
+    borderRadius: 1000,
+  },
+  circle1: {
+    width: 400,
+    height: 400,
+    top: -150,
+    right: -150,
+  },
+  circle2: {
+    width: 350,
+    height: 350,
+    bottom: -120,
+    left: -120,
+  },
   keyboardView: {
     flex: 1,
   },
@@ -164,54 +206,96 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 32,
-    paddingTop: 48,
+    paddingTop: 40,
     paddingBottom: 32,
   },
+  logoWrapper: {
+    alignSelf: 'center',
+    marginBottom: 24,
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoBackground: {
+    position: 'absolute',
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#00C8FC',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  logo: {
+    width: 80,
+    height: 80,
+    resizeMode: 'contain',
+    zIndex: 1,
+  },
   title: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: 'bold',
-    marginBottom: 8,
+    marginBottom: 6,
+    textAlign: 'center',
   },
   subtitle: {
-    fontSize: 16,
-    opacity: 0.7,
-    marginBottom: 40,
+    fontSize: 14,
+    opacity: 0.6,
+    marginBottom: 32,
+    textAlign: 'center',
+    letterSpacing: 0.3,
   },
   inputContainer: {
-    marginBottom: 24,
+    marginBottom: 20,
   },
   label: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     marginBottom: 8,
+    letterSpacing: 0.2,
   },
   input: {
     borderRadius: 12,
-    paddingVertical: 16,
+    paddingVertical: 14,
     paddingHorizontal: 16,
-    fontSize: 16,
+    fontSize: 15,
   },
   forgotPasswordContainer: {
     alignSelf: 'flex-end',
-    marginBottom: 32,
+    marginBottom: 28,
   },
   forgotPasswordText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
+    letterSpacing: 0.2,
   },
   loginButton: {
-    paddingVertical: 16,
+    paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
     marginBottom: 24,
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 5,
   },
   loginButtonPressed: {
-    opacity: 0.8,
+    opacity: 0.85,
+    transform: [{ scale: 0.98 }],
   },
   loginButtonText: {
     color: '#FFFFFF',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
+    letterSpacing: 0.3,
   },
   signUpContainer: {
     flexDirection: 'row',
@@ -219,19 +303,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   signUpText: {
-    fontSize: 14,
+    fontSize: 13,
+    opacity: 0.7,
   },
   signUpLink: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
+    letterSpacing: 0.2,
   },
   backToHomeContainer: {
     marginTop: 16,
     alignItems: 'center',
   },
   backToHomeText: {
-    fontSize: 14,
-    opacity: 0.6,
+    fontSize: 12,
+    letterSpacing: 0.3,
   },
 });
 

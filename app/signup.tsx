@@ -140,12 +140,29 @@ export default function SignUpScreen() {
 
   return (
     <ThemedView style={styles.container}>
+      {/* Background Gradient Overlay */}
+      <View style={styles.gradientOverlay}>
+        <View style={[styles.circle, styles.circle1, { backgroundColor: '#00C8FC', opacity: isDark ? 0.08 : 0.12 }]} />
+        <View style={[styles.circle, styles.circle2, { backgroundColor: '#00C8FC', opacity: isDark ? 0.08 : 0.12 }]} />
+      </View>
+
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.content}>
+            {/* Logo */}
+            <View style={styles.logoWrapper}>
+              {isDark && (
+                <View style={styles.logoBackground} />
+              )}
+              <Image
+                source={require('@/assets/images/icon.png')}
+                style={styles.logo}
+              />
+            </View>
+
             <ThemedText style={styles.title}>Create Account</ThemedText>
             <ThemedText style={styles.subtitle}>Please fill in the details below</ThemedText>
 
@@ -153,14 +170,14 @@ export default function SignUpScreen() {
             <View style={styles.imageContainer}>
               <Pressable 
                 onPress={pickImage}
-                style={[styles.imagePicker, { borderColor: colors.primary }]}
+                style={[styles.imagePicker, { borderColor: '#00C8FC' }]}
                 disabled={loading}
               >
                 {imageUri ? (
                   <Image source={{ uri: imageUri }} style={styles.profileImage} />
                 ) : (
                   <View style={styles.imagePlaceholder}>
-                    <ThemedText style={[styles.imageText, { color: colors.primary }]}>
+                    <ThemedText style={[styles.imageText, { color: '#00C8FC' }]}>
                       + Add Photo
                     </ThemedText>
                     <ThemedText style={styles.imageSubtext}>(Optional)</ThemedText>
@@ -170,7 +187,7 @@ export default function SignUpScreen() {
             </View>
 
             {/* Student/Staff Toggle */}
-            <View style={[styles.toggleContainer, { backgroundColor: `${colors.primary}15` }]}>
+            <View style={[styles.toggleContainer, { backgroundColor: '#00C8FC15' }]}>
               <ThemedText style={styles.toggleLabel}>I am a:</ThemedText>
               <View style={styles.toggleRow}>
                 <ThemedText style={[styles.toggleText, !isStudent && styles.toggleTextActive]}>
@@ -179,7 +196,7 @@ export default function SignUpScreen() {
                 <Switch
                   value={isStudent}
                   onValueChange={setIsStudent}
-                  trackColor={{ false: colors.warning, true: colors.success }}
+                  trackColor={{ false: colors.warning, true: '#00C8FC' }}
                   thumbColor="#FFFFFF"
                 />
                 <ThemedText style={[styles.toggleText, isStudent && styles.toggleTextActive]}>
@@ -332,7 +349,10 @@ export default function SignUpScreen() {
             <Pressable
               style={({ pressed }) => [
                 styles.signUpButton,
-                { backgroundColor: colors.primary },
+                { 
+                  backgroundColor: '#00C8FC',
+                  shadowColor: '#00C8FC',
+                },
                 (pressed || loading) && styles.signUpButtonPressed,
               ]}
               onPress={handleSignUp}
@@ -341,7 +361,7 @@ export default function SignUpScreen() {
               {loading ? (
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
-                <ThemedText style={styles.signUpButtonText}>Sign Up</ThemedText>
+                <ThemedText style={styles.signUpButtonText}>Create Account</ThemedText>
               )}
             </Pressable>
 
@@ -349,13 +369,13 @@ export default function SignUpScreen() {
             <View style={styles.loginContainer}>
               <ThemedText style={styles.loginText}>Already have an account? </ThemedText>
               <Pressable onPress={() => router.push('/login')}>
-                <ThemedText style={[styles.loginLink, { color: colors.primary }]}>Login</ThemedText>
+                <ThemedText style={[styles.loginLink, { color: '#00C8FC' }]}>Sign In</ThemedText>
               </Pressable>
             </View>
 
             {/* Back to Home Link */}
             <Pressable onPress={() => router.push('/')} style={styles.backToHomeContainer}>
-              <ThemedText style={styles.backToHomeText}>← Back to Home</ThemedText>
+              <ThemedText style={[styles.backToHomeText, { color: colors.textTertiary }]}>← Back to Home</ThemedText>
             </Pressable>
           </View>
         </ScrollView>
@@ -368,6 +388,28 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  gradientOverlay: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    overflow: 'hidden',
+  },
+  circle: {
+    position: 'absolute',
+    borderRadius: 1000,
+  },
+  circle1: {
+    width: 400,
+    height: 400,
+    top: -150,
+    right: -150,
+  },
+  circle2: {
+    width: 350,
+    height: 350,
+    bottom: -120,
+    left: -120,
+  },
   keyboardView: {
     flex: 1,
   },
@@ -377,29 +419,61 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 32,
-    paddingTop: 24,
+    paddingTop: 32,
     paddingBottom: 32,
   },
+  logoWrapper: {
+    alignSelf: 'center',
+    marginBottom: 20,
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoBackground: {
+    position: 'absolute',
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#00C8FC',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  logo: {
+    width: 60,
+    height: 60,
+    resizeMode: 'contain',
+    zIndex: 1,
+  },
   title: {
-    fontSize: 32,
+    fontSize: 26,
     fontWeight: 'bold',
-    marginBottom: 8,
+    marginBottom: 6,
+    textAlign: 'center',
   },
   subtitle: {
-    fontSize: 16,
-    opacity: 0.7,
+    fontSize: 13,
+    opacity: 0.6,
     marginBottom: 24,
+    textAlign: 'center',
+    letterSpacing: 0.3,
   },
   toggleContainer: {
-    marginBottom: 24,
-    paddingVertical: 16,
+    marginBottom: 20,
+    paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 12,
   },
   toggleLabel: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
-    marginBottom: 12,
+    marginBottom: 10,
+    letterSpacing: 0.2,
   },
   toggleRow: {
     flexDirection: 'row',
@@ -408,7 +482,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   toggleText: {
-    fontSize: 16,
+    fontSize: 14,
     opacity: 0.5,
   },
   toggleTextActive: {
@@ -416,33 +490,43 @@ const styles = StyleSheet.create({
     opacity: 1,
   },
   inputContainer: {
-    marginBottom: 20,
+    marginBottom: 16,
   },
   label: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     marginBottom: 8,
+    letterSpacing: 0.2,
   },
   input: {
     borderRadius: 12,
-    paddingVertical: 16,
+    paddingVertical: 14,
     paddingHorizontal: 16,
-    fontSize: 16,
+    fontSize: 15,
   },
   signUpButton: {
-    paddingVertical: 16,
+    paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
     marginTop: 8,
     marginBottom: 24,
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 5,
   },
   signUpButtonPressed: {
-    opacity: 0.8,
+    opacity: 0.85,
+    transform: [{ scale: 0.98 }],
   },
   signUpButtonText: {
     color: '#FFFFFF',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
+    letterSpacing: 0.3,
   },
   loginContainer: {
     flexDirection: 'row',
@@ -450,19 +534,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loginText: {
-    fontSize: 14,
+    fontSize: 13,
+    opacity: 0.7,
   },
   loginLink: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
+    letterSpacing: 0.2,
   },
   backToHomeContainer: {
     marginTop: 16,
     alignItems: 'center',
   },
   backToHomeText: {
-    fontSize: 14,
-    opacity: 0.6,
+    fontSize: 12,
+    letterSpacing: 0.3,
   },
   helperText: {
     fontSize: 12,
@@ -471,12 +557,12 @@ const styles = StyleSheet.create({
   },
   imageContainer: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 20,
   },
   imagePicker: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     borderWidth: 2,
     borderStyle: 'dashed',
     justifyContent: 'center',
@@ -486,19 +572,19 @@ const styles = StyleSheet.create({
   profileImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 60,
+    borderRadius: 50,
   },
   imagePlaceholder: {
     justifyContent: 'center',
     alignItems: 'center',
   },
   imageText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     marginBottom: 4,
   },
   imageSubtext: {
-    fontSize: 12,
+    fontSize: 11,
     opacity: 0.6,
   },
 });

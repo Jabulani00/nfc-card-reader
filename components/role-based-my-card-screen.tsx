@@ -272,108 +272,123 @@ export default function RoleBasedMyCardScreen({ role }: RoleBasedMyCardScreenPro
                 },
               ]}
             >
-              {/* Glow Effect Overlay */}
-              {isCardVisible && (
-                <Animated.View
-                  style={[
-                    styles.glowOverlay,
-                    {
-                      opacity: glowOpacity,
-                      transform: [{ scale: glowScale }],
-                    },
-                  ]}
-                />
-              )}
+              <View style={styles.bankCardInner}>
+                {/* Glow Effect Overlay */}
+                {isCardVisible && (
+                  <Animated.View
+                    style={[
+                      styles.glowOverlay,
+                      {
+                        opacity: glowOpacity,
+                        transform: [{ scale: glowScale }],
+                      },
+                    ]}
+                  />
+                )}
 
-              {/* Gradient Background */}
-              <View style={styles.cardGradient}>
-                <View style={[styles.gradientCircle1]} />
-                <View style={[styles.gradientCircle2]} />
-              </View>
-
-              {/* Card Content */}
-              <View style={[styles.bankCardContent, isCardVisible && styles.portraitCardContent]}>
-                {/* Card Type with Countdown */}
-                <View style={styles.cardTopRow}>
-                  <ThemedText style={styles.cardType}>{config.cardTypeLabel}</ThemedText>
-                  {isCardVisible ? (
-                    <View style={styles.countdownBadge}>
-                      <ThemedText style={styles.countdownText}>{countdown}s</ThemedText>
-                    </View>
-                  ) : (
-                    <View style={styles.cardChip}>
-                      <View style={styles.chipPattern} />
-                    </View>
-                  )}
+                {/* Gradient Background */}
+                <View style={styles.cardGradient}>
+                  <View style={[styles.gradientCircle1]} />
+                  <View style={[styles.gradientCircle2]} />
                 </View>
 
-                {/* Card Number - Blurred or Visible */}
-                <View style={styles.cardNumberSection}>
-                  <ThemedText style={styles.cardLabel}>Card Number</ThemedText>
+                {/* Card Content */}
+                <View style={[styles.bankCardContent, isCardVisible && styles.portraitCardContent]}>
+                  {/* Card Type with Countdown */}
+                  <View style={styles.cardTopRow}>
                   <ThemedText
                     style={[
-                      styles.cardNumber,
-                      !isCardVisible && styles.blurredText,
-                      isCardVisible && styles.portraitText,
+                      styles.cardType,
+                      isCardVisible && styles.portraitCardType,
                     ]}
                   >
-                    {isCardVisible ? user!.cardNumber : '•••• •••• ••••'}
+                    {config.cardTypeLabel}
                   </ThemedText>
-                </View>
+                    {isCardVisible ? (
+                      <View style={styles.countdownBadge}>
+                        <ThemedText style={styles.countdownText}>{countdown}s</ThemedText>
+                      </View>
+                    ) : (
+                      <View style={styles.cardChip}>
+                        <View style={styles.chipPattern} />
+                      </View>
+                    )}
+                  </View>
 
-                {/* Card Details */}
-                <View style={[styles.cardDetailsRow, isCardVisible && styles.portraitDetailsRow]}>
-                  <View style={styles.cardDetailItem}>
-                    <ThemedText style={styles.cardLabel}>Name</ThemedText>
+                  {/* Card Number - Blurred or Visible */}
+                  <View style={styles.cardNumberSection}>
+                    <ThemedText style={styles.cardLabel}>Card Number</ThemedText>
                     <ThemedText
                       style={[
-                        styles.cardValue,
-                        !isCardVisible && styles.blurredText,
-                        isCardVisible && styles.portraitText,
+                      styles.cardNumber,
+                      !isCardVisible && styles.blurredText,
+                      isCardVisible && styles.portraitCardNumber,
                       ]}
                     >
-                      {isCardVisible ? fullName || 'Unnamed User' : '•••••••••'}
+                      {isCardVisible ? user!.cardNumber : '•••• •••• ••••'}
                     </ThemedText>
                   </View>
-                  <View style={styles.cardDetailItem}>
-                    <ThemedText style={styles.cardLabel}>Valid From</ThemedText>
-                    <ThemedText
-                      style={[
+
+                  {/* Card Details */}
+                  <View style={[styles.cardDetailsRow, isCardVisible && styles.portraitDetailsRow]}>
+                    <View style={styles.cardDetailItem}>
+                      <ThemedText style={styles.cardLabel}>Name</ThemedText>
+                      <ThemedText
+                        style={[
                         styles.cardValue,
                         !isCardVisible && styles.blurredText,
-                        isCardVisible && styles.portraitText,
-                      ]}
-                    >
-                      {isCardVisible ? card.formatDate(user!.createdAt) : '••/••/••'}
-                    </ThemedText>
+                        isCardVisible && styles.portraitCardValue,
+                        ]}
+                      >
+                        {isCardVisible ? fullName || 'Unnamed User' : '•••••••••'}
+                      </ThemedText>
+                    </View>
+                    <View style={styles.cardDetailItem}>
+                      <ThemedText style={styles.cardLabel}>Valid From</ThemedText>
+                      <ThemedText
+                        style={[
+                        styles.cardValue,
+                        !isCardVisible && styles.blurredText,
+                        isCardVisible && styles.portraitCardValue,
+                        ]}
+                      >
+                        {isCardVisible ? card.formatDate(user!.createdAt) : '••/••/••'}
+                      </ThemedText>
+                    </View>
                   </View>
-                </View>
 
-                {/* NFC Icon - Animated when active */}
-                <Animated.View
-                  style={[
-                    styles.nfcIconWrapper,
-                    isCardVisible && {
-                      opacity: glowOpacity,
-                    },
-                  ]}
-                >
-                  <View style={styles.nfcIcon}>
-                    <View style={styles.nfcWave1} />
-                    <View style={styles.nfcWave2} />
-                    <View style={styles.nfcWave3} />
+                  {/* NFC Icon - Animated when active */}
+                  <Animated.View
+                    style={[
+                      styles.nfcIconWrapper,
+                      isCardVisible && {
+                        opacity: glowOpacity,
+                      },
+                    ]}
+                  >
+                    <View style={styles.nfcIcon}>
+                      <View style={styles.nfcWave1} />
+                      <View style={styles.nfcWave2} />
+                      <View style={styles.nfcWave3} />
+                    </View>
+                  </Animated.View>
+
+                  {/* Hidden NFC ID for reading */}
+                  <View style={styles.hiddenNfc}>
+                    <ThemedText style={styles.nfcId}>{user!.nfcId || user!.uid}</ThemedText>
                   </View>
-                </Animated.View>
-
-                {/* Hidden NFC ID for reading */}
-                <View style={styles.hiddenNfc}>
-                  <ThemedText style={styles.nfcId}>{user!.nfcId || user!.uid}</ThemedText>
                 </View>
               </View>
             </Animated.View>
 
             {/* Action Buttons - Bank Style */}
-            <View style={[styles.cardActions, isCardVisible && styles.portraitCardActions]}>
+            <View
+              style={[
+                styles.cardActions,
+                isCardVisible && styles.portraitCardActions,
+                isCardVisible && styles.cardActionsActive,
+              ]}
+            >
               <Pressable
                 style={({ pressed }) => [
                   styles.actionButton,
@@ -698,9 +713,17 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 460,
     alignSelf: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   portraitCardWrapper: {
-    marginBottom: 100, // Extra space when card is in portrait to prevent overlap
+    marginBottom: 40,
+    marginTop: 24,
+    paddingVertical: 60,
+    minHeight: 560,
+    justifyContent: 'space-between',
+    width: '100%',
+    alignItems: 'center',
   },
   bankCard: {
     width: '100%',
@@ -716,6 +739,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 16,
     elevation: 12,
+  },
+  bankCardInner: {
+    flex: 1,
+    borderRadius: 20,
+    overflow: 'hidden',
   },
   glowOverlay: {
     position: 'absolute',
@@ -767,7 +795,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   portraitCardContent: {
-    padding: 20,
+    padding: 16,
+    gap: 8,
   },
   cardTopRow: {
     flexDirection: 'row',
@@ -779,6 +808,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     letterSpacing: 2,
+  },
+  portraitCardType: {
+    fontSize: 12,
+    letterSpacing: 1.2,
   },
   cardChip: {
     width: 48,
@@ -825,20 +858,28 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     fontFamily: 'monospace',
   },
+  portraitCardNumber: {
+    fontSize: 18,
+    letterSpacing: 1,
+    lineHeight: 24,
+  },
   blurredText: {
     opacity: 0.5,
   },
   cardDetailsRow: {
     flexDirection: 'row',
-    gap: 32,
+    gap: 16,
     marginTop: 4,
   },
   portraitDetailsRow: {
-    flexDirection: 'column',
-    gap: 16,
+    flexWrap: 'wrap',
+    columnGap: 12,
+    rowGap: 10,
   },
   cardDetailItem: {
     gap: 4,
+    flex: 1,
+    minWidth: '45%',
   },
   portraitText: {
     fontSize: 16,
@@ -848,6 +889,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     letterSpacing: 0.5,
+  },
+  portraitCardValue: {
+    fontSize: 13,
+    lineHeight: 18,
   },
   nfcIconWrapper: {
     position: 'absolute',
@@ -904,9 +949,15 @@ const styles = StyleSheet.create({
   cardActions: {
     flexDirection: 'row',
     gap: 12,
+    alignSelf: 'stretch',
   },
   portraitCardActions: {
-    marginTop: 20, // Extra margin when card is rotated to portrait
+    marginTop: 20,
+  },
+  cardActionsActive: {
+    marginTop: 32,
+    paddingTop: 16,
+    paddingBottom: 24,
   },
   actionButton: {
     flex: 1,

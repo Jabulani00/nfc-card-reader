@@ -6,6 +6,11 @@ export interface User {
   email: string;
   FirstName: string;
   LastName: string;
+  /**
+   * @deprecated Legacy lowercase name fields retained for backward compatibility
+   */
+  firstName?: string;
+  lastName?: string;
   cardNumber: string;
   nfcId?: string; // Optional - assigned by admin after approval
   imageUrl?: string;

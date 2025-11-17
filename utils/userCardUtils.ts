@@ -8,16 +8,27 @@ export class UserCardUtils {
    * Get user initials from first and last name
    */
   static getInitials(user: User | null, fallback: string = 'XX'): string {
-    if (!user || !user.firstName || !user.lastName) return fallback;
-    return `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase();
+    if (!user) return fallback;
+    const firstName = user.FirstName ?? user.firstName;
+    const lastName = user.LastName ?? user.lastName;
+
+    if (!firstName || !lastName) return fallback;
+
+    return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
   }
 
   /**
    * Get full name from user
    */
   static getFullName(user: User | null): string {
-    if (!user || !user.firstName || !user.lastName) return '';
-    return `${user.firstName} ${user.lastName}`;
+    if (!user) return '';
+
+    const firstName = user.FirstName ?? user.firstName;
+    const lastName = user.LastName ?? user.lastName;
+
+    if (!firstName || !lastName) return '';
+
+    return `${firstName} ${lastName}`;
   }
 
   /**

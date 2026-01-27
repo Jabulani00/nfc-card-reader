@@ -5,9 +5,173 @@ import { Colors } from '@/constants/colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useUserCard } from '@/hooks/use-user-card';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, Animated, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import NfcManager, { NfcTech } from 'react-native-nfc-manager';
 
 type Role = 'student' | 'staff' | 'admin';
+
+////////////////////////////// NFC/RFID helpers //////////////////////////////
+
+/**
+ * Read student RFID card data
+ * This function is designed to work with common student ID RFID cards
+ * (typically MIFARE Classic, MIFARE Ultralight, or ISO14443A cards)
+ */
+const readStudentRfidCard = async (): Promise<{
+  cardId: string;
+  cardType: string;
+  data?: any;
+} | null> => {
+  try {
+    // Request NFC technology - using NfcA for most student RFID cards
+    await NfcManager.requestTechnology([NfcTech.NfcA, NfcTech.MifareClassic]);
+    
+    // Get the tag information
+    const tag = await NfcManager.getTag();
+    
+    if (!tag) {
+      console.log('No tag found');
+      return null;
+    }
+
+    console.log('Tag detected:', tag);
+
+    // Extract card ID (UID) - this is the unique identifier
+    const cardId = tag.id || 'UNKNOWN';
+    
+    // Get card type
+    const cardType = tag.techTypes?.join(', ') || 'Unknown RFID';
+    
+    // For MIFARE Classic cards, you can read specific sectors
+    // (requires authentication with keys - usually default keys)
+    let additionalData = null;
+    
+    if (tag.techTypes?.includes('android.nfc.tech.MifareClassic')) {
+      try {
+        additionalData = await readMifareClassicData();
+      } catch (error) {
+        console.log('Could not read MIFARE data:', error);
+      }
+    }
+
+    return {
+      cardId: formatCardId(cardId),
+      cardType,
+      data: additionalData,
+    };
+  } catch (error) {
+    console.log('RFID card read error:', error);
+    return null;
+  } finally {
+    // Always cancel the technology request
+    NfcManager.cancelTechnologyRequest();
+  }
+};
+
+/**
+ * Read data from MIFARE Classic card sectors
+ * Note: This requires knowing the authentication keys
+ * Most student cards use default keys: [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]
+ */
+const readMifareClassicData = async () => {
+  try {
+    const defaultKey = [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]; // Default MIFARE key
+    const sector = 1; // Read from sector 1 (sector 0 is usually system data)
+    const blockIndex = 4; // First block of sector 1
+
+    // Authenticate with the sector
+    await NfcManager.mifareClassicAuthenticateA(blockIndex, defaultKey);
+    
+    // Read the block
+    const data = await NfcManager.mifareClassicReadBlock(blockIndex);
+    
+    return {
+      sector,
+      block: blockIndex,
+      data: toHexString(data),
+    };
+  } catch (error) {
+    console.log('MIFARE read error:', error);
+    return null;
+  }
+};
+
+/**
+ * Format card ID for display
+ * Converts byte array to readable hex format
+ */
+const formatCardId = (cardId: string | number[]): string => {
+  if (typeof cardId === 'string') {
+    return cardId.toUpperCase();
+  }
+  
+  if (Array.isArray(cardId)) {
+    return cardId
+      .map(byte => ('00' + byte.toString(16).toUpperCase()).slice(-2))
+      .join(':');
+  }
+  
+  return 'UNKNOWN';
+};
+
+/**
+ * Convert byte array to hex string
+ */
+const toHexString = (byteArr: number[]): string => {
+  return byteArr
+    .map(byte => ('00' + byte.toString(16).toUpperCase()).slice(-2))
+    .join(' ');
+};
+
+/**
+ * Verify student card against backend
+ * This replaces the payment processing with student verification
+ */
+const verifyStudentCard = async (cardId: string, studentData: any) => {
+  try {
+    const response = await fetch('http://localhost:8081/verify-student-card', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        cardId, 
+        studentData,
+        timestamp: new Date().toISOString(),
+      }),
+    });
+    
+    const result = await response.json();
+    return result;
+  } catch (error) {
+    console.log('Verification error:', error);
+    return { success: false, error: 'Network error' };
+  }
+};
+
+/**
+ * Handle successful card read
+ */
+const handleCardSuccess = (cardData: any) => {
+  console.log('Student card read successfully:', cardData);
+  Alert.alert(
+    'Card Read Successfully',
+    `Card ID: ${cardData.cardId}\nType: ${cardData.cardType}`,
+    [{ text: 'OK' }]
+  );
+};
+
+/**
+ * Handle card read failure
+ */
+const handleCardFailure = (error?: string) => {
+  console.log('Card read failed:', error);
+  Alert.alert(
+    'Card Read Failed',
+    error || 'Unable to read student card. Please try again.',
+    [{ text: 'OK' }]
+  );
+};
+
+////////////////////////////// Main Component //////////////////////////////
 
 type RoleConfig = {
   cardHeaderTitle: string;
@@ -54,6 +218,8 @@ export default function RoleBasedMyCardScreen({ role }: RoleBasedMyCardScreenPro
   const [isCardVisible, setIsCardVisible] = useState(false);
   const [showFullDetails, setShowFullDetails] = useState(false);
   const [countdown, setCountdown] = useState(30);
+  const [isNfcSupported, setIsNfcSupported] = useState<boolean | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
 
   // Animation values
   const flipAnim = useRef(new Animated.Value(0)).current;
@@ -61,6 +227,114 @@ export default function RoleBasedMyCardScreen({ role }: RoleBasedMyCardScreenPro
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const rotateAnim = useRef(new Animated.Value(0)).current;
   const glowAnimationRef = useRef<Animated.CompositeAnimation | null>(null);
+
+  // Initialize NFC
+  useEffect(() => {
+    let isMounted = true;
+
+    const initNfc = async () => {
+      try {
+        // NFC is not available on web, and the native module will be undefined.
+        if (Platform.OS === 'web') {
+          console.log('NFC not supported on web platform');
+          if (isMounted) {
+            setIsNfcSupported(false);
+          }
+          return;
+        }
+
+        // Extra guard: native NFC module may not be available
+        // (e.g. running inside Expo Go or a build without react-native-nfc-manager linked).
+        if (
+          !NfcManager ||
+          typeof (NfcManager as any).isSupported !== 'function' ||
+          typeof (NfcManager as any).start !== 'function'
+        ) {
+          console.log(
+            'NFC manager native module not available in this runtime. ' +
+              'Build a native app / custom dev client with react-native-nfc-manager to enable NFC.'
+          );
+          if (isMounted) {
+            setIsNfcSupported(false);
+          }
+          return;
+        }
+
+        // Check support first, then start NFC only on supported native platforms
+        const supported = await NfcManager.isSupported();
+        if (!isMounted) return;
+
+        setIsNfcSupported(supported);
+
+        if (supported) {
+          await NfcManager.start();
+
+          if (!(await NfcManager.isEnabled())) {
+            Alert.alert(
+              'NFC is disabled',
+              'Please enable NFC in settings to scan student cards.'
+            );
+          }
+        }
+      } catch (error) {
+        console.error('NFC init failed:', error);
+        if (isMounted) setIsNfcSupported(false);
+      }
+    };
+
+    initNfc();
+
+    return () => {
+      isMounted = false;
+      if (Platform.OS !== 'web') {
+        NfcManager.cancelTechnologyRequest().catch(() => {});
+      }
+    };
+  }, []);
+
+  // Handle scanning student RFID card
+  const handleScanCard = async () => {
+    if (!isNfcSupported) {
+      Alert.alert(
+        'NFC Not Available',
+        'NFC is not available in this app build or on this device. ' +
+          'If your device supports NFC, install a native build that includes react-native-nfc-manager.'
+      );
+      return;
+    }
+
+    setIsScanning(true);
+
+    try {
+      Alert.alert(
+        'Ready to Scan',
+        'Please hold your student card near the device.',
+        [{ text: 'Cancel', onPress: () => setIsScanning(false) }]
+      );
+
+      const cardData = await readStudentRfidCard();
+
+      if (cardData) {
+        handleCardSuccess(cardData);
+
+        // Optionally verify with backend
+        const verification = await verifyStudentCard(cardData.cardId, card.user);
+
+        if (verification.success) {
+          console.log('Card verified:', verification);
+        } else {
+          console.log('Card verification failed:', verification);
+        }
+      } else {
+        handleCardFailure();
+      }
+    } catch (error) {
+      console.error('Scan error:', error);
+      handleCardFailure(error instanceof Error ? error.message : 'Unknown error');
+    } finally {
+      setIsScanning(false);
+    }
+  };
 
   // Handle card activation with flip and glow
   const handleCardAccess = () => {
@@ -412,6 +686,24 @@ export default function RoleBasedMyCardScreen({ role }: RoleBasedMyCardScreenPro
                   { borderColor: '#00C8FC' },
                   pressed && styles.buttonPressed,
                 ]}
+                onPress={handleScanCard}
+                disabled={isScanning}
+              >
+                <View style={styles.buttonIconWrapper}>
+                  <ThemedText style={styles.buttonIcon}>📱</ThemedText>
+                </View>
+                <ThemedText style={[styles.secondaryButtonText, { color: '#00C8FC' }]}>
+                  {isScanning ? 'Scanning...' : 'Scan Physical Card'}
+                </ThemedText>
+              </Pressable>
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.actionButton,
+                  styles.secondaryButton,
+                  { borderColor: '#00C8FC' },
+                  pressed && styles.buttonPressed,
+                ]}
                 onPress={() => setShowFullDetails(!showFullDetails)}
               >
                 <View style={styles.buttonIconWrapper}>
@@ -637,8 +929,8 @@ export default function RoleBasedMyCardScreen({ role }: RoleBasedMyCardScreenPro
                   How to Use Your Card
                 </ThemedText>
                 <ThemedText style={styles.infoBoxText}>
-                  Present this digital card at NFC readers around campus for building access, library
-                  services, and meal plans. Your card is encrypted and secure.
+                  Present this digital card at RFID readers around campus for building access, library
+                  services, and meal plans. Tap "Scan Physical Card" to register a new physical student card.
                 </ThemedText>
               </View>
             </View>
@@ -648,6 +940,8 @@ export default function RoleBasedMyCardScreen({ role }: RoleBasedMyCardScreenPro
     </ThemedView>
   );
 }
+
+
 
 const styles = StyleSheet.create({
   container: {

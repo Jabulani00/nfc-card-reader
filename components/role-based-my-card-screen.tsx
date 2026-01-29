@@ -23,10 +23,21 @@ const readStudentRfidCard = async (): Promise<{
   data?: any;
 } | null> => {
   try {
+    // Check if NfcManager is available
+    if (!NfcManager || typeof (NfcManager as any)?.requestTechnology !== 'function') {
+      console.log('NFC manager not available');
+      return null;
+    }
+
     // Request NFC technology - using NfcA for most student RFID cards
     await NfcManager.requestTechnology([NfcTech.NfcA, NfcTech.MifareClassic]);
     
     // Get the tag information
+    if (typeof (NfcManager as any)?.getTag !== 'function') {
+      console.log('getTag method not available');
+      return null;
+    }
+    
     const tag = await NfcManager.getTag();
     
     if (!tag) {
@@ -63,8 +74,10 @@ const readStudentRfidCard = async (): Promise<{
     console.log('RFID card read error:', error);
     return null;
   } finally {
-    // Always cancel the technology request
-    NfcManager.cancelTechnologyRequest();
+    // Always cancel the technology request if available
+    if (NfcManager && typeof (NfcManager as any)?.cancelTechnologyRequest === 'function') {
+      NfcManager.cancelTechnologyRequest().catch(() => {});
+    }
   }
 };
 
@@ -75,6 +88,14 @@ const readStudentRfidCard = async (): Promise<{
  */
 const readMifareClassicData = async () => {
   try {
+    // Check if NfcManager methods are available
+    if (!NfcManager || 
+        typeof (NfcManager as any)?.mifareClassicAuthenticateA !== 'function' ||
+        typeof (NfcManager as any)?.mifareClassicReadBlock !== 'function') {
+      console.log('MIFARE methods not available');
+      return null;
+    }
+
     const defaultKey = [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]; // Default MIFARE key
     const sector = 1; // Read from sector 1 (sector 0 is usually system data)
     const blockIndex = 4; // First block of sector 1
@@ -227,6 +248,7 @@ export default function RoleBasedMyCardScreen({ role }: RoleBasedMyCardScreenPro
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const rotateAnim = useRef(new Animated.Value(0)).current;
   const glowAnimationRef = useRef<Animated.CompositeAnimation | null>(null);
+  const isDeactivatingRef = useRef(false);
 
   // Initialize NFC
   useEffect(() => {
@@ -247,8 +269,10 @@ export default function RoleBasedMyCardScreen({ role }: RoleBasedMyCardScreenPro
         // (e.g. running inside Expo Go or a build without react-native-nfc-manager linked).
         if (
           !NfcManager ||
-          typeof (NfcManager as any).isSupported !== 'function' ||
-          typeof (NfcManager as any).start !== 'function'
+          NfcManager === null ||
+          typeof NfcManager !== 'object' ||
+          typeof (NfcManager as any)?.isSupported !== 'function' ||
+          typeof (NfcManager as any)?.start !== 'function'
         ) {
           console.log(
             'NFC manager native module not available in this runtime. ' +
@@ -261,19 +285,29 @@ export default function RoleBasedMyCardScreen({ role }: RoleBasedMyCardScreenPro
         }
 
         // Check support first, then start NFC only on supported native platforms
+        // Add additional null check before calling methods
+        if (!NfcManager || typeof (NfcManager as any)?.isSupported !== 'function') {
+          if (isMounted) {
+            setIsNfcSupported(false);
+          }
+          return;
+        }
+
         const supported = await NfcManager.isSupported();
         if (!isMounted) return;
 
         setIsNfcSupported(supported);
 
-        if (supported) {
+        if (supported && NfcManager && typeof (NfcManager as any)?.start === 'function') {
           await NfcManager.start();
 
-          if (!(await NfcManager.isEnabled())) {
-            Alert.alert(
-              'NFC is disabled',
-              'Please enable NFC in settings to scan student cards.'
-            );
+          if (NfcManager && typeof (NfcManager as any)?.isEnabled === 'function') {
+            if (!(await NfcManager.isEnabled())) {
+              Alert.alert(
+                'NFC is disabled',
+                'Please enable NFC in settings to scan student cards.'
+              );
+            }
           }
         }
       } catch (error) {
@@ -286,7 +320,7 @@ export default function RoleBasedMyCardScreen({ role }: RoleBasedMyCardScreenPro
 
     return () => {
       isMounted = false;
-      if (Platform.OS !== 'web') {
+      if (Platform.OS !== 'web' && NfcManager && typeof (NfcManager as any)?.cancelTechnologyRequest === 'function') {
         NfcManager.cancelTechnologyRequest().catch(() => {});
       }
     };
@@ -339,6 +373,9 @@ export default function RoleBasedMyCardScreen({ role }: RoleBasedMyCardScreenPro
   // Handle card activation with flip and glow
   const handleCardAccess = () => {
     if (!isCardVisible) {
+      // Reset deactivation flag when activating
+      isDeactivatingRef.current = false;
+      
       // Activate card with animations
       setIsCardVisible(true);
       setCountdown(30);
@@ -390,16 +427,20 @@ export default function RoleBasedMyCardScreen({ role }: RoleBasedMyCardScreenPro
   };
 
   const deactivateCard = () => {
-    setIsCardVisible(false);
-    setCountdown(30); // Reset countdown
+    // Prevent multiple simultaneous deactivation calls
+    if (isDeactivatingRef.current) {
+      return;
+    }
+    isDeactivatingRef.current = true;
 
-    // Stop glow animation loop
+    // Stop glow animation loop first
     if (glowAnimationRef.current) {
       glowAnimationRef.current.stop();
       glowAnimationRef.current = null;
     }
 
     // Reset all animations to return to landscape
+    // Use parallel to animate all properties simultaneously
     Animated.parallel([
       Animated.spring(rotateAnim, {
         toValue: 0,
@@ -424,7 +465,23 @@ export default function RoleBasedMyCardScreen({ role }: RoleBasedMyCardScreenPro
         duration: 300,
         useNativeDriver: true,
       }),
-    ]).start();
+    ]).start((finished) => {
+      // Only update state after animations complete
+      if (finished) {
+        // Ensure all animation values are reset
+        rotateAnim.setValue(0);
+        flipAnim.setValue(0);
+        scaleAnim.setValue(1);
+        glowAnim.setValue(0);
+        
+        // Update state after animations are complete
+        setIsCardVisible(false);
+        setCountdown(30); // Reset countdown
+      }
+      
+      // Reset deactivation flag
+      isDeactivatingRef.current = false;
+    });
   };
 
   // Countdown timer effect
@@ -434,11 +491,13 @@ export default function RoleBasedMyCardScreen({ role }: RoleBasedMyCardScreenPro
     if (isCardVisible && countdown > 0) {
       interval = setInterval(() => {
         setCountdown((prev) => {
-          if (prev <= 1) {
-            deactivateCard();
-            return 30;
+          const newCountdown = prev - 1;
+          if (newCountdown <= 0) {
+            // Trigger deactivation when countdown reaches 0
+            setTimeout(() => deactivateCard(), 0);
+            return 0;
           }
-          return prev - 1;
+          return newCountdown;
         });
       }, 1000);
     }
@@ -672,28 +731,10 @@ export default function RoleBasedMyCardScreen({ role }: RoleBasedMyCardScreenPro
                 onPress={handleCardAccess}
               >
                 <View style={styles.buttonIconWrapper}>
-                  <ThemedText style={styles.buttonIcon}>{isCardVisible ? '✕' : '👁️'}</ThemedText>
+                  <ThemedText style={styles.buttonIcon}>{isCardVisible ? '✕' : '📱'}</ThemedText>
                 </View>
                 <ThemedText style={styles.primaryButtonText}>
-                  {isCardVisible ? `Cancel (${countdown}s)` : 'Tap to Access'}
-                </ThemedText>
-              </Pressable>
-
-              <Pressable
-                style={({ pressed }) => [
-                  styles.actionButton,
-                  styles.secondaryButton,
-                  { borderColor: '#00C8FC' },
-                  pressed && styles.buttonPressed,
-                ]}
-                onPress={handleScanCard}
-                disabled={isScanning}
-              >
-                <View style={styles.buttonIconWrapper}>
-                  <ThemedText style={styles.buttonIcon}>📱</ThemedText>
-                </View>
-                <ThemedText style={[styles.secondaryButtonText, { color: '#00C8FC' }]}>
-                  {isScanning ? 'Scanning...' : 'Scan Physical Card'}
+                  {isCardVisible ? `Cancel (${countdown}s)` : 'Tap Access'}
                 </ThemedText>
               </Pressable>
 
@@ -929,8 +970,8 @@ export default function RoleBasedMyCardScreen({ role }: RoleBasedMyCardScreenPro
                   How to Use Your Card
                 </ThemedText>
                 <ThemedText style={styles.infoBoxText}>
-                  Present this digital card at RFID readers around campus for building access, library
-                  services, and meal plans. Tap "Scan Physical Card" to register a new physical student card.
+                  Tap "Tap Access" to activate your card and present it at RFID readers around campus for building access, library
+                  services, and meal plans. Your phone will act as a physical card that can be scanned by NFC readers.
                 </ThemedText>
               </View>
             </View>
@@ -1018,6 +1059,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     width: '100%',
     alignItems: 'center',
+    gap: 24,
   },
   bankCard: {
     width: '100%',
@@ -1244,14 +1286,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
     alignSelf: 'stretch',
+    width: '100%',
+    flexWrap: 'nowrap',
   },
   portraitCardActions: {
-    marginTop: 20,
+    marginTop: 24,
+    paddingTop: 8,
   },
   cardActionsActive: {
     marginTop: 32,
     paddingTop: 16,
     paddingBottom: 24,
+    gap: 12,
   },
   actionButton: {
     flex: 1,
@@ -1259,9 +1305,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 16,
-    paddingHorizontal: 20,
+    paddingHorizontal: 12,
     borderRadius: 16,
-    gap: 10,
+    gap: 8,
+    minWidth: 0,
+    flexShrink: 1,
   },
   primaryButton: {
     backgroundColor: '#00C8FC',
@@ -1296,11 +1344,15 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     letterSpacing: 0.3,
+    flexShrink: 1,
+    textAlign: 'center',
   },
   secondaryButtonText: {
     fontSize: 15,
     fontWeight: '700',
     letterSpacing: 0.3,
+    flexShrink: 1,
+    textAlign: 'center',
   },
   portraitSpacing: {
     marginTop: 20, // Extra spacing when card is in portrait

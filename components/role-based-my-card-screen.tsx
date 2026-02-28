@@ -3,6 +3,7 @@ import { ThemedView } from '@/components/themed-view';
 import { UserCardLoading } from '@/components/user-card-loading';
 import { Colors } from '@/constants/colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useNfcHce } from '@/hooks/useNfcHce';
 import { useUserCard } from '@/hooks/use-user-card';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Animated, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -236,6 +237,7 @@ export default function RoleBasedMyCardScreen({ role }: RoleBasedMyCardScreenPro
   const colors = Colors[colorScheme ?? 'light'];
   const isDark = colorScheme === 'dark';
   const card = useUserCard();
+  const { startEmitting, stopEmitting } = useNfcHce();
   const [isCardVisible, setIsCardVisible] = useState(false);
   const [showFullDetails, setShowFullDetails] = useState(false);
   const [countdown, setCountdown] = useState(30);
@@ -380,6 +382,12 @@ export default function RoleBasedMyCardScreen({ role }: RoleBasedMyCardScreenPro
       setIsCardVisible(true);
       setCountdown(30);
 
+      // Start NFC HCE: emit tag with current user's nfcId/uid so readers can look up user in Firebase
+      const payload = card.user?.nfcId || card.user?.uid || '';
+      if (payload) {
+        void startEmitting(payload);
+      }
+
       // Rotation animation (landscape to portrait)
       Animated.spring(rotateAnim, {
         toValue: 1,
@@ -432,6 +440,9 @@ export default function RoleBasedMyCardScreen({ role }: RoleBasedMyCardScreenPro
       return;
     }
     isDeactivatingRef.current = true;
+
+    // Stop NFC HCE so phone no longer emits as a tag
+    void stopEmitting();
 
     // Stop glow animation loop first
     if (glowAnimationRef.current) {
@@ -508,14 +519,15 @@ export default function RoleBasedMyCardScreen({ role }: RoleBasedMyCardScreenPro
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isCardVisible, countdown]);
 
-  // Cleanup animations on unmount
+  // Cleanup animations and NFC HCE on unmount
   useEffect(() => {
     return () => {
       if (glowAnimationRef.current) {
         glowAnimationRef.current.stop();
       }
+      void stopEmitting();
     };
-  }, []);
+  }, [stopEmitting]);
 
   // Interpolate animations
   const rotateZ = rotateAnim.interpolate({

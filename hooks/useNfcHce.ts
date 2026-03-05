@@ -15,25 +15,48 @@ export function useNfcHce() {
     setEnabled: (enabled: boolean) => Promise<void>;
   } | null>(null);
 
-  const startEmitting = useCallback(async (content: string): Promise<void> => {
-    if (Platform.OS !== 'android') return;
+  const startEmitting = useCallback(
+    async (
+      content: string
+    ): Promise<{ success: boolean; error?: Error }> => {
+      if (Platform.OS !== 'android') {
+        const error = new Error('NFC card emulation is only available on Android devices.');
+        return { success: false, error };
+      }
 
-    try {
-      const { HCESession, NFCTagType4, NFCTagType4NDEFContentType } = await import('react-native-hce');
-      const tag = new NFCTagType4({
-        type: NFCTagType4NDEFContentType.Text,
-        content: content || 'unknown',
-        writable: false,
-      });
-      const session = await HCESession.getInstance();
-      session.setApplication(tag);
-      await session.setEnabled(true);
-      sessionRef.current = session;
-      setIsEmitting(true);
-    } catch (e) {
-      console.warn('NFC HCE start failed (expected on iOS/web or if HCE not available):', e);
-    }
-  }, []);
+      try {
+        const {
+          HCESession,
+          NFCTagType4,
+          NFCTagType4NDEFContentType,
+        } = await import('react-native-hce');
+
+        const tag = new NFCTagType4({
+          type: NFCTagType4NDEFContentType.Text,
+          content: content || 'unknown',
+          writable: false,
+        });
+
+        const session = await HCESession.getInstance();
+        session.setApplication(tag);
+        await session.setEnabled(true);
+        sessionRef.current = session;
+        setIsEmitting(true);
+
+        return { success: true };
+      } catch (e) {
+        const error =
+          e instanceof Error ? e : new Error(String(e ?? 'Unknown NFC HCE error'));
+        console.warn(
+          'NFC HCE start failed (expected on iOS/web or if HCE not available):',
+          error
+        );
+        setIsEmitting(false);
+        return { success: false, error };
+      }
+    },
+    []
+  );
 
   const stopEmitting = useCallback(async () => {
     if (Platform.OS !== 'android' || !sessionRef.current) return;

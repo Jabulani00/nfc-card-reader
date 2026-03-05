@@ -1,10 +1,11 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { useToast } from '@/components/Toast';
 import { UserCardLoading } from '@/components/user-card-loading';
 import { Colors } from '@/constants/colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useNfcHce } from '@/hooks/useNfcHce';
 import { useUserCard } from '@/hooks/use-user-card';
+import { useNfcHce } from '@/hooks/useNfcHce';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Animated, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import NfcManager, { NfcTech } from 'react-native-nfc-manager';
@@ -237,6 +238,7 @@ export default function RoleBasedMyCardScreen({ role }: RoleBasedMyCardScreenPro
   const colors = Colors[colorScheme ?? 'light'];
   const isDark = colorScheme === 'dark';
   const card = useUserCard();
+  const toast = useToast();
   const { startEmitting, stopEmitting } = useNfcHce();
   const [isCardVisible, setIsCardVisible] = useState(false);
   const [showFullDetails, setShowFullDetails] = useState(false);
@@ -373,8 +375,21 @@ export default function RoleBasedMyCardScreen({ role }: RoleBasedMyCardScreenPro
   };
 
   // Handle card activation with flip and glow
-  const handleCardAccess = () => {
+  const handleCardAccess = async () => {
     if (!isCardVisible) {
+      // Validate NFC/HCE capability before trying to emit
+      if (Platform.OS !== 'android') {
+        toast.error('NFC card emulation is only available on Android devices.');
+        console.log('[NFC-HCE] Emit requested on non-Android platform');
+        return;
+      }
+
+      if (isNfcSupported === false) {
+        toast.error('This device does not support NFC or it is disabled.');
+        console.log('[NFC-HCE] Emit requested but NFC is not supported/enabled');
+        return;
+      }
+
       // Reset deactivation flag when activating
       isDeactivatingRef.current = false;
       
@@ -384,8 +399,42 @@ export default function RoleBasedMyCardScreen({ role }: RoleBasedMyCardScreenPro
 
       // Start NFC HCE: emit tag with current user's nfcId/uid so readers can look up user in Firebase
       const payload = card.user?.nfcId || card.user?.uid || '';
-      if (payload) {
-        void startEmitting(payload);
+      if (payload && card.user) {
+        const result = await startEmitting(payload);
+
+        if (result.success) {
+          console.log('[NFC-HCE] Emitting NFC tag', {
+            payload,
+            user: {
+              id: card.user.uid,
+              nfcId: card.user.nfcId,
+              cardNumber: card.user.cardNumber,
+              name: card.getFullName(),
+              email: card.user.email,
+              role: card.user.role,
+            },
+          });
+          toast.success('Your NFC card is active and emitting. Tap an NFC reader to test.');
+        } else {
+          const message =
+            result.error?.message ||
+            'NFC card emulation failed. Your device may not support HCE or the module is missing.';
+          console.log('[NFC-HCE] Start emission failed', result.error);
+          toast.error(message);
+          // Since emitting failed, revert the visual activation state
+          setIsCardVisible(false);
+          setCountdown(30);
+          return;
+        }
+      } else {
+        console.log(
+          '[NFC-HCE] No NFC ID/UID available for emission. Current user:',
+          card.user
+        );
+        toast.error('No NFC ID found on your profile. Please contact support.');
+        setIsCardVisible(false);
+        setCountdown(30);
+        return;
       }
 
       // Rotation animation (landscape to portrait)

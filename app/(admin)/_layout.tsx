@@ -4,14 +4,38 @@ import { Colors } from '@/constants/colors';
 import { useAuth } from '@/contexts/AuthContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Stack, usePathname, useRouter } from 'expo-router';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { useEffect } from 'react';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
 
 export default function AdminLayout() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const router = useRouter();
   const pathname = usePathname();
-  const { logout } = useAuth();
+  const { user, loading, logout } = useAuth();
+
+  // Auth / role guard: only admins can access this layout
+  useEffect(() => {
+    if (loading) return;
+
+    if (!user) {
+      router.replace('/login');
+      return;
+    }
+
+    if (!user.isApproved || !user.isActive) {
+      router.replace('/pending-approval');
+      return;
+    }
+
+    if (user.role !== 'admin') {
+      if (user.role === 'staff') {
+        router.replace('/(staff)/my-card');
+      } else {
+        router.replace('/(student)/my-card');
+      }
+    }
+  }, [user, loading, router]);
 
   const handleLogout = async () => {
     try {
@@ -34,6 +58,15 @@ export default function AdminLayout() {
   ];
 
   const currentTab = tabs.find(tab => pathname === tab.path);
+
+  // While checking auth / redirecting, show a simple loading state
+  if (loading || !user || user.role !== 'admin') {
+    return (
+      <ThemedView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </ThemedView>
+    );
+  }
 
   return (
     <ThemedView style={styles.container}>

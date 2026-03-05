@@ -4,14 +4,38 @@ import { Colors } from '@/constants/colors';
 import { useAuth } from '@/contexts/AuthContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Stack, usePathname, useRouter } from 'expo-router';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { useEffect } from 'react';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
 
 export default function StudentLayout() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const router = useRouter();
   const pathname = usePathname();
-  const { logout } = useAuth();
+  const { user, loading, logout } = useAuth();
+
+  // Auth / role guard: only students can access this layout
+  useEffect(() => {
+    if (loading) return;
+
+    if (!user) {
+      router.replace('/login');
+      return;
+    }
+
+    if (!user.isApproved || !user.isActive) {
+      router.replace('/pending-approval');
+      return;
+    }
+
+    if (user.role !== 'student') {
+      if (user.role === 'admin') {
+        router.replace('/(admin)/students');
+      } else {
+        router.replace('/(staff)/my-card');
+      }
+    }
+  }, [user, loading, router]);
 
   const handleLogout = async () => {
     try {
@@ -28,6 +52,14 @@ export default function StudentLayout() {
   const tabs = [
     { name: 'my-card', label: 'My Card', icon: '💳', path: '/(student)/my-card' },
   ];
+
+  if (loading || !user || user.role !== 'student') {
+    return (
+      <ThemedView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={colors.info} />
+      </ThemedView>
+    );
+  }
 
   return (
     <ThemedView style={styles.container}>
